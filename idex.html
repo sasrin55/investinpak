@@ -51,6 +51,7 @@
             <th class="border border-gray-300 px-4 py-2">1 Year Return (%)</th>
             <th class="border border-gray-300 px-4 py-2">3 Year Return (%)</th>
             <th class="border border-gray-300 px-4 py-2">5 Year Return (%)</th>
+            <th class="border border-gray-300 px-4 py-2">Projected Value (PKR)</th>
           </tr>
         </thead>
         <tbody id="resultsBody" class="text-center">
@@ -88,4 +89,67 @@
         risk: 'Medium',
         returns: { '1': 13, '3': 15, '5': 17 }
       },
-     
+      {
+        type: 'Real Estate',
+        risk: 'Medium',
+        returns: { '1': 10, '3': 12, '5': 15 }
+      },
+      {
+        type: 'Gold',
+        risk: 'Low',
+        returns: { '1': 8, '3': 10, '5': 12 }
+      },
+      {
+        type: 'Cryptocurrency',
+        risk: 'High',
+        returns: { '1': 25, '3': 30, '5': 35 }
+      }
+    ];
+
+    // Form submission handler
+    document.getElementById('filterForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      // Get form values
+      const amount = parseFloat(document.getElementById('amount').value);
+      const horizon = document.getElementById('horizon').value;
+      const risk = document.getElementById('risk').value;
+      
+      // Filter and sort investments
+      let filteredOptions = investmentOptions;
+      
+      // Filter by risk if not "All"
+      if (risk) {
+        filteredOptions = investmentOptions.filter(option => option.risk === risk);
+      }
+      
+      // Sort by best return for selected horizon
+      filteredOptions.sort((a, b) => b.returns[horizon] - a.returns[horizon]);
+      
+      // Generate table rows
+      const resultsBody = document.getElementById('resultsBody');
+      resultsBody.innerHTML = '';
+      
+      filteredOptions.forEach(option => {
+        const row = document.createElement('tr');
+        
+        // Calculate projected value
+        const returnRate = option.returns[horizon] / 100;
+        const years = parseInt(horizon);
+        const projectedValue = amount * Math.pow(1 + returnRate, years);
+        
+        row.innerHTML = `
+          <td class="border border-gray-300 px-4 py-2 text-left">${option.type}</td>
+          <td class="border border-gray-300 px-4 py-2 text-left">${option.risk}</td>
+          <td class="border border-gray-300 px-4 py-2">${option.returns['1']}%</td>
+          <td class="border border-gray-300 px-4 py-2">${option.returns['3']}%</td>
+          <td class="border border-gray-300 px-4 py-2">${option.returns['5']}%</td>
+          <td class="border border-gray-300 px-4 py-2 font-medium">${projectedValue.toLocaleString('en-PK', {maximumFractionDigits: 0})}</td>
+        `;
+        
+        resultsBody.appendChild(row);
+      });
+    });
+  </script>
+</body>
+</html>
