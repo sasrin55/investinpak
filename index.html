@@ -3,63 +3,147 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Investment Options Comparison</title>
-  <!-- TailwindCSS CDN for styling -->
+  <title>Robinhood-Style Investment Comparison</title>
+  <!-- TailwindCSS with Robinhood colors -->
   <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
-  <div class="max-w-4xl w-full bg-white p-6 rounded-lg shadow-lg">
-    <h1 class="text-2xl font-semibold mb-4 text-center">Investment Comparison Tool</h1>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'rh-green': '#00C805',
+            'rh-dark': '#0E0E0E',
+            'rh-light': '#F8F8F8',
+            'rh-card': '#FFFFFF',
+            'rh-border': '#E5E5E5',
+            'rh-text': '#333333',
+            'rh-text-light': '#666666',
+            'rh-positive': '#00C805',
+            'rh-negative': '#FF3B30',
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Load Inter font (Robinhood's font) -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #00C805;
+      border-radius: 3px;
+    }
     
-    <!-- Input Form -->
-    <form id="filterForm" class="space-y-4 mb-6">
-      <div>
-        <label class="block mb-1 font-medium" for="amount">Investment Amount (PKR):</label>
-        <input type="number" id="amount" class="w-full border border-gray-300 rounded px-3 py-2" placeholder="Enter amount" required />
+    /* Animation for price changes */
+    @keyframes pulseGreen {
+      0% { background-color: transparent; }
+      50% { background-color: rgba(0, 200, 5, 0.1); }
+      100% { background-color: transparent; }
+    }
+    
+    .positive-change {
+      animation: pulseGreen 1.5s ease-out;
+    }
+  </style>
+</head>
+<body class="bg-rh-light min-h-screen font-sans">
+  <!-- Top Navigation Bar -->
+  <header class="bg-white shadow-sm">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-rh-green" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2L4 8v12h16V8L12 2zm0 2.5l6 4.5v9H6v-9l6-4.5z"/>
+        </svg>
+        <span class="text-xl font-bold text-rh-dark">InvestCompare</span>
+      </div>
+      <button class="bg-rh-green text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-opacity-90 transition">
+        Sign Up
+      </button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-8">
+    <!-- Hero Section -->
+    <div class="bg-gradient-to-r from-rh-green to-emerald-500 rounded-xl p-6 mb-8 text-white">
+      <h1 class="text-3xl font-bold mb-2">Investment Comparison Tool</h1>
+      <p class="opacity-90">Compare returns across different investment vehicles</p>
+    </div>
+
+    <!-- Input Form - Robinhood Style -->
+    <form id="filterForm" class="bg-white rounded-xl shadow-sm border border-rh-border p-6 mb-8">
+      <h2 class="text-xl font-semibold mb-6 text-rh-dark">Filter Options</h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Investment Amount -->
+        <div>
+          <label class="block mb-2 font-medium text-rh-text" for="amount">Investment Amount</label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-rh-text-light">
+              ₨
+            </div>
+            <input type="number" id="amount" class="w-full pl-8 border border-rh-border rounded-lg px-4 py-3 focus:ring-2 focus:ring-rh-green focus:border-transparent" placeholder="10,000" required />
+          </div>
+        </div>
+        
+        <!-- Time Horizon -->
+        <div>
+          <label class="block mb-2 font-medium text-rh-text" for="horizon">Time Horizon</label>
+          <select id="horizon" class="w-full border border-rh-border rounded-lg px-4 py-3 focus:ring-2 focus:ring-rh-green focus:border-transparent appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiAjNjY2NjY2IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iNiA5IDEyIDE1IDE4IDkiPjwvcG9seWxpbmU+PC9zdmc+')] bg-no-repeat bg-[right_1rem_center] bg-[length:1rem]" required>
+            <option value="" disabled selected>Select duration</option>
+            <option value="1">1 Year</option>
+            <option value="3">3 Years</option>
+            <option value="5">5+ Years</option>
+          </select>
+        </div>
+        
+        <!-- Risk Tolerance -->
+        <div>
+          <label class="block mb-2 font-medium text-rh-text" for="risk">Risk Tolerance</label>
+          <select id="risk" class="w-full border border-rh-border rounded-lg px-4 py-3 focus:ring-2 focus:ring-rh-green focus:border-transparent appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiA2NjY2NjYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSI2IDkgMTIgMTUgMTggOSI+PC9wb2x5bGluZT48L3N2Zz4=')] bg-no-repeat bg-[right_1rem_center] bg-[length:1rem]" required>
+            <option value="" disabled selected>Select risk level</option>
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+          </select>
+        </div>
       </div>
       
-      <div>
-        <label class="block mb-1 font-medium" for="horizon">Time Horizon:</label>
-        <select id="horizon" class="w-full border border-gray-300 rounded px-3 py-2" required>
-          <option value="" disabled selected>Select time horizon</option>
-          <option value="1">1 Year</option>
-          <option value="3">3 Years</option>
-          <option value="5">5+ Years</option>
-        </select>
-      </div>
-      
-      <div>
-        <label class="block mb-1 font-medium" for="risk">Risk Tolerance:</label>
-        <select id="risk" class="w-full border border-gray-300 rounded px-3 py-2" required>
-          <option value="" disabled selected>Select risk level</option>
-          <option value="Low">Low</option>
-          <option value="Medium">Medium</option>
-          <option value="High">High</option>
-        </select>
-      </div>
-      
-      <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Compare</button>
+      <button type="submit" class="mt-6 w-full bg-rh-green text-white px-4 py-3 rounded-lg font-medium hover:bg-opacity-90 transition-all duration-200 transform hover:-translate-y-0.5">
+        Compare Investments
+      </button>
     </form>
 
-    <!-- Results Table -->
-    <div class="overflow-x-auto">
-      <table class="w-full table-auto border-collapse border border-gray-300 rounded-lg">
-        <thead class="bg-gray-100">
-          <tr>
-            <th class="border border-gray-300 px-4 py-2 text-left">Investment Type</th>
-            <th class="border border-gray-300 px-4 py-2 text-left">Risk Level</th>
-            <th class="border border-gray-300 px-4 py-2">1 Year Return (%)</th>
-            <th class="border border-gray-300 px-4 py-2">3 Year Return (%)</th>
-            <th class="border border-gray-300 px-4 py-2">5 Year Return (%)</th>
-            <th class="border border-gray-300 px-4 py-2">Projected Value (PKR)</th>
-          </tr>
-        </thead>
-        <tbody id="resultsBody" class="text-center">
-          <!-- Dynamic Content Here -->
-        </tbody>
-      </table>
+    <!-- Results Table - Robinhood Style -->
+    <div class="bg-white rounded-xl shadow-sm border border-rh-border overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead class="bg-rh-light border-b border-rh-border">
+            <tr>
+              <th class="px-6 py-4 text-left font-semibold text-rh-text">Investment</th>
+              <th class="px-6 py-4 text-left font-semibold text-rh-text">Risk</th>
+              <th class="px-6 py-4 text-right font-semibold text-rh-text">1Y Return</th>
+              <th class="px-6 py-4 text-right font-semibold text-rh-text">3Y Return</th>
+              <th class="px-6 py-4 text-right font-semibold text-rh-text">5Y Return</th>
+              <th class="px-6 py-4 text-right font-semibold text-rh-text">Projected Value</th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody" class="divide-y divide-rh-border">
+            <!-- Dynamic content will appear here -->
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
+  </main>
 
   <script>
     // Investment options data
@@ -132,19 +216,43 @@
       
       filteredOptions.forEach(option => {
         const row = document.createElement('tr');
+        row.className = 'hover:bg-rh-light transition';
         
         // Calculate projected value
         const returnRate = option.returns[horizon] / 100;
         const years = parseInt(horizon);
         const projectedValue = amount * Math.pow(1 + returnRate, years);
         
+        // Format numbers with commas
+        const formattedValue = projectedValue.toLocaleString('en-PK', {
+          maximumFractionDigits: 0,
+          style: 'currency',
+          currency: 'PKR'
+        }).replace('PKR', '₨');
+        
         row.innerHTML = `
-          <td class="border border-gray-300 px-4 py-2 text-left">${option.type}</td>
-          <td class="border border-gray-300 px-4 py-2 text-left">${option.risk}</td>
-          <td class="border border-gray-300 px-4 py-2">${option.returns['1']}%</td>
-          <td class="border border-gray-300 px-4 py-2">${option.returns['3']}%</td>
-          <td class="border border-gray-300 px-4 py-2">${option.returns['5']}%</td>
-          <td class="border border-gray-300 px-4 py-2 font-medium">${projectedValue.toLocaleString('en-PK', {maximumFractionDigits: 0})}</td>
+          <td class="px-6 py-4 text-left font-medium text-rh-dark">${option.type}</td>
+          <td class="px-6 py-4 text-left">
+            <span class="px-2 py-1 text-xs rounded-full ${
+              option.risk === 'High' ? 'bg-red-100 text-red-800' : 
+              option.risk === 'Medium' ? 'bg-amber-100 text-amber-800' : 
+              'bg-green-100 text-green-800'
+            }">
+              ${option.risk}
+            </span>
+          </td>
+          <td class="px-6 py-4 text-right font-medium ${option.returns['1'] > 0 ? 'text-rh-positive' : 'text-rh-negative'}">
+            ${option.returns['1']}%
+          </td>
+          <td class="px-6 py-4 text-right font-medium ${option.returns['3'] > 0 ? 'text-rh-positive' : 'text-rh-negative'}">
+            ${option.returns['3']}%
+          </td>
+          <td class="px-6 py-4 text-right font-medium ${option.returns['5'] > 0 ? 'text-rh-positive' : 'text-rh-negative'}">
+            ${option.returns['5']}%
+          </td>
+          <td class="px-6 py-4 text-right font-bold text-rh-dark positive-change">
+            ${formattedValue}
+          </td>
         `;
         
         resultsBody.appendChild(row);
