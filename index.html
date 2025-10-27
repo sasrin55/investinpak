@@ -46,6 +46,193 @@
             font-weight: 400;
         }
 
+        .btn-methodology {
+            margin-top: 20px;
+            padding: 10px 24px;
+            background: white;
+            color: #0f4c81;
+            border: 2px solid white;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-methodology:hover {
+            background: rgba(255, 255, 255, 0.9);
+            transform: translateY(-2px);
+        }
+
+        .methodology-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            overflow-y: auto;
+        }
+
+        .methodology-modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .methodology-content {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            max-width: 900px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            position: relative;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .methodology-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 32px;
+            color: #6b7280;
+            cursor: pointer;
+            line-height: 1;
+            transition: color 0.2s ease;
+        }
+
+        .methodology-close:hover {
+            color: #1a1a1a;
+        }
+
+        .methodology-content h2 {
+            color: #0f4c81;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .methodology-content h3 {
+            color: #1a1a1a;
+            font-size: 20px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 10px;
+        }
+
+        .methodology-content h4 {
+            color: #0f4c81;
+            font-size: 16px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .methodology-content p {
+            line-height: 1.7;
+            color: #374151;
+            margin-bottom: 15px;
+        }
+
+        .methodology-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .methodology-table th {
+            background: #f9fafb;
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #1a1a1a;
+            border-bottom: 2px solid #e5e7eb;
+            font-size: 14px;
+        }
+
+        .methodology-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f3f4f6;
+            color: #374151;
+            font-size: 14px;
+        }
+
+        .methodology-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .methodology-table tr:hover {
+            background: #f9fafb;
+        }
+
+        .rating-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            margin: 20px 0;
+        }
+
+        .rating-badge.excellent {
+            background: #dcfce7;
+            color: #15803d;
+            border: 2px solid #15803d;
+        }
+
+        .rating-badge.good {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 2px solid #1e40af;
+        }
+
+        .rating-badge.moderate {
+            background: #fef3c7;
+            color: #92400e;
+            border: 2px solid #92400e;
+        }
+
+        .rating-badge.weak {
+            background: #fed7aa;
+            color: #c2410c;
+            border: 2px solid #c2410c;
+        }
+
+        .rating-badge.very-weak {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 2px solid #991b1b;
+        }
+
+        .stars {
+            font-size: 24px;
+            letter-spacing: 2px;
+        }
+
         .score-section {
             background: white;
             padding: 35px 50px 40px 50px;
@@ -486,6 +673,7 @@
         <div class="header">
             <h1>SMEDA Grant Evaluation System</h1>
             <p>Small and Medium Enterprises Development Authority - Grant Assessment Portal</p>
+            <button class="btn-methodology" onclick="showMethodology()">View Methodology</button>
         </div>
 
         <div class="score-section">
@@ -494,7 +682,125 @@
                 <span class="score-value"><span id="currentScore">0</span> / 1000 points</span>
             </div>
             <div class="progress-bar-container">
-                <div class="progress-bar" id="progressBar" style="width: 0%;">0%</div>
+                <div class="progress-bar" id="progressBar" style="width: 0%;" data-percent="0%"></div>
+            </div>
+        </div>
+
+        <!-- Methodology Modal -->
+        <div id="methodologyModal" class="methodology-modal">
+            <div class="methodology-content">
+                <span class="methodology-close" onclick="closeMethodology()">&times;</span>
+                
+                <h2>SME Credit Scoring Methodology</h2>
+                <p style="font-size: 16px; color: #6b7280; margin-bottom: 30px;">Understanding how your evaluation score translates into recommendations</p>
+
+                <h3>Purpose</h3>
+                <p>The SME Credit Scoring System translates both quantitative and qualitative business indicators into a standardized 1,000-point model. It provides a transparent, evidence-based way to assess the creditworthiness of manufacturing, services, and trade SMEs — sectors that are critical to Pakistan's economic growth but often face difficulty accessing finance due to limited collateral or credit histories.</p>
+
+                <h3>1. Structure of the Scoring Model</h3>
+                <p>Each SME is evaluated across five major dimensions. The points allocated to each reflect the relative importance of that dimension in predicting SME financial stability and repayment capacity.</p>
+
+                <table class="methodology-table">
+                    <thead>
+                        <tr>
+                            <th>Dimension</th>
+                            <th>Description</th>
+                            <th>Max Points</th>
+                            <th>Reason for Weighting</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Financial Health</strong></td>
+                            <td>Measures profitability, leverage, liquidity, and cash flow management.</td>
+                            <td>300</td>
+                            <td>Financial stability is the most direct and proven predictor of repayment ability.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Credit Behavior</strong></td>
+                            <td>Assesses banking history, loan repayment trends, and transaction discipline.</td>
+                            <td>200</td>
+                            <td>Past payment behavior is the strongest behavioral predictor of future reliability.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Market & Business Stability</strong></td>
+                            <td>Evaluates market position, supplier diversity, and industry outlook.</td>
+                            <td>150</td>
+                            <td>Markets define sustainability. SMEs in stable markets are more resilient.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Qualitative & Governance</strong></td>
+                            <td>Examines ownership transparency, registration, compliance, and management experience.</td>
+                            <td>200</td>
+                            <td>Strong governance signals lower operational risk in developing economies.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Operational Efficiency</strong></td>
+                            <td>Looks at production reliability, logistics, and human capital stability.</td>
+                            <td>150</td>
+                            <td>Operational bottlenecks directly affect delivery capacity and cash flow continuity.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>2. Rating Classification</h3>
+                <p>The total score maps to a star-based rating system that determines eligibility for grants, financing, mentoring, and training:</p>
+
+                <table class="methodology-table">
+                    <thead>
+                        <tr>
+                            <th>Score Range</th>
+                            <th>Star Rating</th>
+                            <th>Interpretation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>760–1000</strong></td>
+                            <td>★★★★★</td>
+                            <td><strong style="color: #15803d;">Strong</strong> – Recommended for Grant or Financing</td>
+                        </tr>
+                        <tr>
+                            <td><strong>610–750</strong></td>
+                            <td>★★★★☆</td>
+                            <td><strong style="color: #1e40af;">Satisfactory</strong> – Recommended for Mentoring</td>
+                        </tr>
+                        <tr>
+                            <td><strong>460–600</strong></td>
+                            <td>★★★☆☆</td>
+                            <td><strong style="color: #92400e;">Moderate</strong> – Eligible for Training & Mentoring</td>
+                        </tr>
+                        <tr>
+                            <td><strong>310–450</strong></td>
+                            <td>★★☆☆☆</td>
+                            <td><strong style="color: #c2410c;">Weak</strong> – Training Recommended</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Below 300</strong></td>
+                            <td>★☆☆☆☆</td>
+                            <td><strong style="color: #991b1b;">Very Weak</strong> – Not Eligible for Incentive</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>3. Why the Model Differs by Sector</h3>
+                <p>Different industries carry different types of risk. To make scoring fair and realistic, the model adjusts the weighting of these five components for each SME sector.</p>
+
+                <h4>Manufacturing SMEs</h4>
+                <p><strong>Weighting:</strong> Financial (35%) • Operational (25%) • Qualitative (15%) • Credit Behavior (15%) • Market (10%)</p>
+                <p><strong>Rationale:</strong> Manufacturing relies on machinery, inputs, and supply chains. Thus, operational strength and liquidity are weighted higher.</p>
+
+                <h4>Services SMEs</h4>
+                <p><strong>Weighting:</strong> Qualitative (30%) • Financial (25%) • Credit Behavior (20%) • Market (15%) • Operational (10%)</p>
+                <p><strong>Rationale:</strong> Service businesses depend on people, relationships, and client retention — governance and management quality are critical.</p>
+
+                <h4>Trade & Retail SMEs</h4>
+                <p><strong>Weighting:</strong> Credit Behavior (30%) • Financial (25%) • Market (25%) • Qualitative (15%) • Operational (5%)</p>
+                <p><strong>Rationale:</strong> Traders face high transaction volume but low fixed assets. Their reliability in payments and inventory turnover drive credit risk.</p>
+
+                <div style="margin-top: 40px; padding-top: 30px; border-top: 2px solid #e5e7eb; text-align: center;">
+                    <button class="btn btn-primary" onclick="closeMethodology()">Close</button>
+                </div>
             </div>
         </div>
 
@@ -526,7 +832,11 @@
                 </div>
                 
                 <div class="final-score" id="finalScore">0</div>
-                <p style="font-size: 16px; color: #6b7280; margin-bottom: 40px;">out of 1000 points</p>
+                <p style="font-size: 16px; color: #6b7280; margin-bottom: 20px;">out of 1000 points</p>
+                
+                <!-- Rating Badge -->
+                <div id="ratingBadge" style="display: flex; justify-content: center; margin-bottom: 20px;"></div>
+                <div id="recommendation" style="text-align: center; font-size: 18px; font-weight: 500; margin-bottom: 40px; color: #1a1a1a;"></div>
                 
                 <div class="score-breakdown" id="scoreBreakdown"></div>
 
@@ -3775,6 +4085,7 @@
             const progressBar = document.getElementById('progressBar');
             progressBar.style.width = percentage + '%';
             progressBar.setAttribute('data-percent', percentage + '%');
+            progressBar.textContent = '';
         }
 
         function showCategory(index) {
@@ -3805,6 +4116,20 @@
             const totalScore = Object.values(answers).reduce((sum, answer) => sum + answer.score, 0);
             document.getElementById('finalScore').textContent = totalScore;
             
+            // Calculate rating based on score
+            const rating = getRating(totalScore);
+            
+            // Display rating badge
+            document.getElementById('ratingBadge').innerHTML = `
+                <div class="rating-badge ${rating.class}">
+                    <span class="stars">${rating.stars}</span>
+                    <span>${rating.label}</span>
+                </div>
+            `;
+            
+            // Display recommendation
+            document.getElementById('recommendation').innerHTML = rating.recommendation;
+            
             let breakdownHTML = '<h3 style="margin-bottom: 20px; color: #333;">Score Breakdown by Category</h3>';
             Object.keys(categoryScores).forEach(categoryName => {
                 const categoryMax = currentQuestions[categoryName].maxScore;
@@ -3824,6 +4149,63 @@
             
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
+
+        function getRating(score) {
+            if (score >= 760) {
+                return {
+                    stars: '★★★★★',
+                    label: 'Strong',
+                    class: 'excellent',
+                    recommendation: 'Recommended for Grant or Financing'
+                };
+            } else if (score >= 610) {
+                return {
+                    stars: '★★★★☆',
+                    label: 'Satisfactory',
+                    class: 'good',
+                    recommendation: 'Recommended for Mentoring'
+                };
+            } else if (score >= 460) {
+                return {
+                    stars: '★★★☆☆',
+                    label: 'Moderate',
+                    class: 'moderate',
+                    recommendation: 'Eligible for Training & Mentoring'
+                };
+            } else if (score >= 310) {
+                return {
+                    stars: '★★☆☆☆',
+                    label: 'Weak',
+                    class: 'weak',
+                    recommendation: 'Training Recommended'
+                };
+            } else {
+                return {
+                    stars: '★☆☆☆☆',
+                    label: 'Very Weak',
+                    class: 'very-weak',
+                    recommendation: 'Not Eligible for Incentive'
+                };
+            }
+        }
+
+        function showMethodology() {
+            document.getElementById('methodologyModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeMethodology() {
+            document.getElementById('methodologyModal').classList.remove('active');
+            document.body.style.overflow = 'auto';
+        }
+
+        // Close methodology modal when clicking outside
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('methodologyModal');
+            if (event.target === modal) {
+                closeMethodology();
+            }
+        });
     </script>
 </body>
 </html>
