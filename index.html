@@ -1,263 +1,1775 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Robinhood-Style Investment Comparison</title>
-  <!-- TailwindCSS with Robinhood colors -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            'rh-green': '#00C805',
-            'rh-dark': '#0E0E0E',
-            'rh-light': '#F8F8F8',
-            'rh-card': '#FFFFFF',
-            'rh-border': '#E5E5E5',
-            'rh-text': '#333333',
-            'rh-text-light': '#666666',
-            'rh-positive': '#00C805',
-            'rh-negative': '#FF3B30',
-          },
-          fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-          }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMEDA Grant Evaluation System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-      }
-    }
-  </script>
-  <!-- Load Inter font (Robinhood's font) -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    /* Custom scrollbar */
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #f1f1f1;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #00C805;
-      border-radius: 3px;
-    }
-    
-    /* Animation for price changes */
-    @keyframes pulseGreen {
-      0% { background-color: transparent; }
-      50% { background-color: rgba(0, 200, 5, 0.1); }
-      100% { background-color: transparent; }
-    }
-    
-    .positive-change {
-      animation: pulseGreen 1.5s ease-out;
-    }
-  </style>
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+            padding: 0;
+            color: #1a1a1a;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            background: #0f4c81;
+            color: white;
+            padding: 40px 50px;
+            border-bottom: 4px solid #0d3d66;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .header p {
+            opacity: 0.95;
+            font-size: 15px;
+            font-weight: 400;
+        }
+
+        .score-section {
+            background: white;
+            padding: 30px 50px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .score-label {
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+        }
+
+        .score-value {
+            font-weight: 600;
+            color: #0f4c81;
+            font-size: 14px;
+        }
+
+        .progress-bar-container {
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: #0f4c81;
+            transition: width 0.5s ease;
+            position: relative;
+        }
+
+        .progress-bar::after {
+            content: attr(data-percent);
+            position: absolute;
+            right: 10px;
+            top: -25px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #0f4c81;
+        }
+
+        .content {
+            padding: 50px;
+        }
+
+        .company-type-selection {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 60px 0;
+        }
+
+        .company-type-selection h2 {
+            margin-bottom: 40px;
+            color: #1a1a1a;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .company-type-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .company-type-btn {
+            padding: 30px 20px;
+            font-size: 16px;
+            border: 2px solid #d1d5db;
+            background: white;
+            color: #1a1a1a;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .company-type-btn:hover {
+            background: #0f4c81;
+            color: white;
+            border-color: #0f4c81;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(15, 76, 129, 0.15);
+        }
+
+        .question-section {
+            margin-bottom: 40px;
+            display: none;
+        }
+
+        .question-section.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .category-header {
+            background: #f9fafb;
+            color: #1a1a1a;
+            padding: 24px 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #e5e7eb;
+            border-left: 4px solid #0f4c81;
+        }
+
+        .category-header h2 {
+            font-size: 22px;
+            font-weight: 600;
+            color: #0f4c81;
+        }
+
+        .category-score {
+            font-weight: 600;
+            font-size: 14px;
+            color: #6b7280;
+            background: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .question-card {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            border: 1px solid #e5e7eb;
+            transition: box-shadow 0.2s ease;
+        }
+
+        .question-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .question-text {
+            font-size: 15px;
+            font-weight: 500;
+            color: #1a1a1a;
+            margin-bottom: 16px;
+            line-height: 1.6;
+        }
+
+        .question-score {
+            display: inline-block;
+            background: #eff6ff;
+            color: #0f4c81;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        select, input[type="text"], input[type="number"], textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 10px;
+            transition: all 0.2s ease;
+            font-family: inherit;
+            background: white;
+        }
+
+        select:hover, input:hover, textarea:hover {
+            border-color: #9ca3af;
+        }
+
+        select:focus, input:focus, textarea:focus {
+            outline: none;
+            border-color: #0f4c81;
+            box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.1);
+        }
+
+        .file-upload-section {
+            margin-top: 16px;
+            padding: 16px;
+            background: #f9fafb;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .file-upload-label {
+            display: block;
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        input[type="file"] {
+            border: none;
+            padding: 8px 0;
+            font-size: 13px;
+        }
+
+        .navigation-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: space-between;
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .btn {
+            padding: 14px 32px;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: #0f4c81;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0d3d66;
+            box-shadow: 0 2px 8px rgba(15, 76, 129, 0.25);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #1a1a1a;
+            border: 1px solid #d1d5db;
+        }
+
+        .btn-secondary:hover {
+            background: #f9fafb;
+            border-color: #9ca3af;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .results-section {
+            display: none;
+            padding: 60px 40px;
+        }
+
+        .results-section.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .results-header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .results-header h2 {
+            font-size: 28px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 12px;
+        }
+
+        .final-score {
+            font-size: 64px;
+            font-weight: 700;
+            color: #0f4c81;
+            margin: 20px 0;
+            letter-spacing: -2px;
+        }
+
+        .score-breakdown {
+            text-align: left;
+            margin: 40px 0;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .score-breakdown h3 {
+            margin-bottom: 24px;
+            color: #1a1a1a;
+            font-size: 18px;
+            font-weight: 600;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .breakdown-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 16px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .breakdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .breakdown-category {
+            font-weight: 500;
+            color: #1a1a1a;
+            font-size: 15px;
+        }
+
+        .breakdown-score {
+            font-weight: 600;
+            color: #0f4c81;
+            font-size: 15px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .note {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 16px 20px;
+            margin-top: 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #92400e;
+            line-height: 1.6;
+        }
+
+        .note strong {
+            font-weight: 600;
+        }
+
+        h3 {
+            color: #1a1a1a;
+            margin: 30px 0 20px 0;
+            font-size: 17px;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 30px 24px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .content {
+                padding: 24px;
+            }
+
+            .score-section {
+                padding: 24px;
+            }
+
+            .company-type-buttons {
+                grid-template-columns: 1fr;
+            }
+
+            .navigation-buttons {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+
+            .question-card {
+                padding: 20px;
+            }
+        }
+
+        @media print {
+            .navigation-buttons {
+                display: none;
+            }
+        }
+    </style>
 </head>
-<body class="bg-rh-light min-h-screen font-sans">
-  <!-- Top Navigation Bar -->
-  <header class="bg-white shadow-sm">
-    <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-      <div class="flex items-center space-x-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-rh-green" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 2L4 8v12h16V8L12 2zm0 2.5l6 4.5v9H6v-9l6-4.5z"/>
-        </svg>
-        <span class="text-xl font-bold text-rh-dark">InvestCompare</span>
-      </div>
-      <button class="bg-rh-green text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-opacity-90 transition">
-        Sign Up
-      </button>
-    </div>
-  </header>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>SMEDA Grant Evaluation System</h1>
+            <p>Small and Medium Enterprises Development Authority - Grant Assessment Portal</p>
+        </div>
 
-  <main class="max-w-6xl mx-auto px-4 py-8">
-    <!-- Hero Section -->
-    <div class="bg-gradient-to-r from-rh-green to-emerald-500 rounded-xl p-6 mb-8 text-white">
-      <h1 class="text-3xl font-bold mb-2">Investment Comparison Tool</h1>
-      <p class="opacity-90">Compare returns across different investment vehicles</p>
-    </div>
-
-    <!-- Input Form - Robinhood Style -->
-    <form id="filterForm" class="bg-white rounded-xl shadow-sm border border-rh-border p-6 mb-8">
-      <h2 class="text-xl font-semibold mb-6 text-rh-dark">Filter Options</h2>
-      
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- Investment Amount -->
-        <div>
-          <label class="block mb-2 font-medium text-rh-text" for="amount">Investment Amount</label>
-          <div class="relative">
-            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-rh-text-light">
-              ₨
+        <div class="score-section">
+            <div class="score-label">
+                <span>Your Current Score</span>
+                <span class="score-value"><span id="currentScore">0</span> / 1000 points</span>
             </div>
-            <input type="number" id="amount" class="w-full pl-8 border border-rh-border rounded-lg px-4 py-3 focus:ring-2 focus:ring-rh-green focus:border-transparent" placeholder="10,000" required />
-          </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar" style="width: 0%;">0%</div>
+            </div>
         </div>
-        
-        <!-- Time Horizon -->
-        <div>
-          <label class="block mb-2 font-medium text-rh-text" for="horizon">Time Horizon</label>
-          <select id="horizon" class="w-full border border-rh-border rounded-lg px-4 py-3 focus:ring-2 focus:ring-rh-green focus:border-transparent appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiAjNjY2NjY2IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iNiA5IDEyIDE1IDE4IDkiPjwvcG9seWxpbmU+PC9zdmc+')] bg-no-repeat bg-[right_1rem_center] bg-[length:1rem]" required>
-            <option value="" disabled selected>Select duration</option>
-            <option value="1">1 Year</option>
-            <option value="3">3 Years</option>
-            <option value="5">5+ Years</option>
-          </select>
-        </div>
-        
-        <!-- Risk Tolerance -->
-        <div>
-          <label class="block mb-2 font-medium text-rh-text" for="risk">Risk Tolerance</label>
-          <select id="risk" class="w-full border border-rh-border rounded-lg px-4 py-3 focus:ring-2 focus:ring-rh-green focus:border-transparent appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiA2NjY2NjYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSI2IDkgMTIgMTUgMTggOSI+PC9wb2x5bGluZT48L3N2Zz4=')] bg-no-repeat bg-[right_1rem_center] bg-[length:1rem]" required>
-            <option value="" disabled selected>Select risk level</option>
-            <option value="Low">Low</option>
-            <option value="Medium">Medium</option>
-            <option value="High">High</option>
-          </select>
-        </div>
-      </div>
-      
-      <button type="submit" class="mt-6 w-full bg-rh-green text-white px-4 py-3 rounded-lg font-medium hover:bg-opacity-90 transition-all duration-200 transform hover:-translate-y-0.5">
-        Compare Investments
-      </button>
-    </form>
 
-    <!-- Results Table - Robinhood Style -->
-    <div class="bg-white rounded-xl shadow-sm border border-rh-border overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead class="bg-rh-light border-b border-rh-border">
-            <tr>
-              <th class="px-6 py-4 text-left font-semibold text-rh-text">Investment</th>
-              <th class="px-6 py-4 text-left font-semibold text-rh-text">Risk</th>
-              <th class="px-6 py-4 text-right font-semibold text-rh-text">1Y Return</th>
-              <th class="px-6 py-4 text-right font-semibold text-rh-text">3Y Return</th>
-              <th class="px-6 py-4 text-right font-semibold text-rh-text">5Y Return</th>
-              <th class="px-6 py-4 text-right font-semibold text-rh-text">Projected Value</th>
-            </tr>
-          </thead>
-          <tbody id="resultsBody" class="divide-y divide-rh-border">
-            <!-- Dynamic content will appear here -->
-          </tbody>
-        </table>
-      </div>
+        <div class="content">
+            <!-- Company Type Selection -->
+            <div id="companyTypeSection" class="company-type-selection">
+                <h2>Select Your Company Type</h2>
+                <div class="company-type-buttons">
+                    <button class="company-type-btn" onclick="selectCompanyType('manufacturing')">
+                        Manufacturing
+                    </button>
+                    <button class="company-type-btn" onclick="selectCompanyType('trading')">
+                        Trading
+                    </button>
+                    <button class="company-type-btn" onclick="selectCompanyType('services')">
+                        Services
+                    </button>
+                </div>
+                <div class="note" style="margin-top: 40px;">
+                    <strong>Note:</strong> Currently, only Manufacturing evaluation is available. Trading and Services evaluations will be added soon.
+                </div>
+            </div>
+
+            <!-- Questions will be dynamically inserted here -->
+            <div id="questionsContainer"></div>
+
+            <!-- Results Section -->
+            <div id="resultsSection" class="results-section">
+                <div class="results-header">
+                    <h2>Evaluation Complete</h2>
+                    <p style="font-size: 16px; color: #6b7280; margin-top: 8px;">Your final assessment score</p>
+                </div>
+                
+                <div class="final-score" id="finalScore">0</div>
+                <p style="font-size: 16px; color: #6b7280; margin-bottom: 40px;">out of 1000 points</p>
+                
+                <div class="score-breakdown" id="scoreBreakdown"></div>
+
+                <div style="display: flex; gap: 16px; justify-content: center; margin-top: 30px;">
+                    <button class="btn btn-primary" onclick="window.print()">Print Results</button>
+                    <button class="btn btn-secondary" onclick="location.reload()">Start New Evaluation</button>
+                </div>
+            </div>
+        </div>
     </div>
-  </main>
 
-  <script>
-    // Investment options data
-    const investmentOptions = [
-      {
-        type: 'Bank Fixed Deposit',
-        risk: 'Low',
-        returns: { '1': 13, '3': 13, '5': 13 }
-      },
-      {
-        type: 'Government Bonds',
-        risk: 'Low',
-        returns: { '1': 14.5, '3': 14.5, '5': 14.5 }
-      },
-      {
-        type: 'Mutual Funds - Stock',
-        risk: 'High',
-        returns: { '1': 15, '3': 18, '5': 20 }
-      },
-      {
-        type: 'Mutual Funds - Income',
-        risk: 'Medium',
-        returns: { '1': 12, '3': 14, '5': 16 }
-      },
-      {
-        type: 'Mutual Funds - Shariah',
-        risk: 'Medium',
-        returns: { '1': 13, '3': 15, '5': 17 }
-      },
-      {
-        type: 'Real Estate',
-        risk: 'Medium',
-        returns: { '1': 10, '3': 12, '5': 15 }
-      },
-      {
-        type: 'Gold',
-        risk: 'Low',
-        returns: { '1': 8, '3': 10, '5': 12 }
-      },
-      {
-        type: 'Cryptocurrency',
-        risk: 'High',
-        returns: { '1': 25, '3': 30, '5': 35 }
-      }
-    ];
+    <script>
+        // Manufacturing questions data
+        const manufacturingQuestions = {
+            "Firm's Capacity": {
+                maxScore: 250,
+                subcategories: {
+                    "Business Structure": {
+                        maxScore: 80,
+                        questions: [
+                            {
+                                id: "edu_level",
+                                question: "What is your highest completed level of education?",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Bachelors & above", value: "bachelors", score: 15 },
+                                    { text: "Up to 12th grade", value: "12th", score: 8 },
+                                    { text: "Under matric", value: "under_matric", score: 5 }
+                                ],
+                                document: "Educational Certificates"
+                            },
+                            {
+                                id: "business_exp",
+                                question: "How many years of business experience do you have?",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than 15 years", value: "15plus", score: 15 },
+                                    { text: "10-15 years", value: "10-15", score: 12 },
+                                    { text: "5-10 years", value: "5-10", score: 8 },
+                                    { text: "Less than 5 years", value: "less5", score: 5 }
+                                ],
+                                document: "Certificate"
+                            },
+                            {
+                                id: "legal_form",
+                                question: "What is the legal form of your organization?",
+                                maxScore: 30,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Private Limited Company", value: "pvt_ltd", score: 30 },
+                                    { text: "Registered Partnership", value: "reg_partnership", score: 25 },
+                                    { text: "Unregistered Partnership", value: "unreg_partnership", score: 10 },
+                                    { text: "Sole Proprietorship", value: "sole", score: 5 }
+                                ],
+                                document: "Registration documents"
+                            },
+                            {
+                                id: "chamber_membership",
+                                question: "Do you have membership of Chamber of Commerce & Industry?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 10 },
+                                    { text: "No", value: "no", score: 0 }
+                                ],
+                                document: "Membership certificates"
+                            },
+                            {
+                                id: "sector_membership",
+                                question: "Do you have membership of sector association(s)?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 10 },
+                                    { text: "No", value: "no", score: 0 }
+                                ],
+                                document: "Membership certificates"
+                            }
+                        ]
+                    },
+                    "Technical Capacity/Innovation": {
+                        maxScore: 120,
+                        questions: [
+                            {
+                                id: "machinery_age",
+                                question: "How old is majority of your core machinery?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Up to 5 years old", value: "5", score: 20 },
+                                    { text: "5-15 years old", value: "5-15", score: 10 },
+                                    { text: "More than 15 years old", value: "15plus", score: 5 }
+                                ]
+                            },
+                            {
+                                id: "tech_status",
+                                question: "What is the status of your core technology with respect to your local competitors?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Most advanced", value: "most", score: 20 },
+                                    { text: "Advanced", value: "advanced", score: 15 },
+                                    { text: "Normal", value: "normal", score: 10 },
+                                    { text: "Basic", value: "basic", score: 5 }
+                                ]
+                            },
+                            {
+                                id: "machinery_investment",
+                                question: "How much have you invested on manufacturing machinery & equipment during the last three years (as % of revenue)?",
+                                maxScore: 25,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than 7%", value: "7plus", score: 25 },
+                                    { text: "6-7%", value: "6-7", score: 15 },
+                                    { text: "5-6%", value: "5-6", score: 10 },
+                                    { text: "Less than 5%", value: "less5", score: 5 },
+                                    { text: "None", value: "none", score: 0 }
+                                ],
+                                document: "Audited financial statements"
+                            },
+                            {
+                                id: "rd_lab",
+                                question: "Do you have a dedicated R&D Lab (Process or product)?",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 15 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "software_systems",
+                                question: "Which of the following best describes the systems your business uses to manage operations?",
+                                maxScore: 40,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Fully integrated ERP system", value: "erp", score: 40 },
+                                    { text: "MIS with some analysis & decision making", value: "mis", score: 25 },
+                                    { text: "Basic record keeping systems", value: "basic", score: 10 },
+                                    { text: "Manual accounting system", value: "manual", score: 5 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Quality Assurance Infrastructure": {
+                        maxScore: 50,
+                        questions: [
+                            {
+                                id: "qa_dept",
+                                question: "Do you have a dedicated quality assurance/control department or staff?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 20 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "qa_lab",
+                                question: "Do you have a quality assurance/control lab?",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 15 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "qa_docs",
+                                question: "Do you have documented quality control systems and procedures (manuals)?",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 15 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+            "Business Performance": {
+                maxScore: 250,
+                subcategories: {
+                    "Financial Performance": {
+                        maxScore: 100,
+                        questions: [
+                            {
+                                id: "revenue_avg",
+                                question: "Average Revenue (Sales) - Last 3 years",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "PKR 500-800 million", value: "500-800", score: 15 },
+                                    { text: "PKR 150-500 million", value: "150-500", score: 12 },
+                                    { text: "PKR 100-150 million", value: "100-150", score: 10 },
+                                    { text: "PKR 50-100 million", value: "50-100", score: 8 },
+                                    { text: "Up to PKR 50 million", value: "up50", score: 6 }
+                                ],
+                                document: "Audited financial statements"
+                            },
+                            {
+                                id: "revenue_growth",
+                                question: "Average Revenue Growth Rate (Last 3 years)",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than 20%", value: "20plus", score: 20 },
+                                    { text: "15-20%", value: "15-20", score: 16 },
+                                    { text: "10-15%", value: "10-15", score: 12 },
+                                    { text: "5-10%", value: "5-10", score: 8 },
+                                    { text: "Up to 5%", value: "up5", score: 4 },
+                                    { text: "0% or below", value: "0", score: 0 }
+                                ],
+                                document: "Audited financial statements"
+                            },
+                            {
+                                id: "net_income_margin",
+                                question: "Net Income Margin (Average)",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than 15%", value: "15plus", score: 20 },
+                                    { text: "12-15%", value: "12-15", score: 16 },
+                                    { text: "10-12%", value: "10-12", score: 12 },
+                                    { text: "5-10%", value: "5-10", score: 8 },
+                                    { text: "Up to 5%", value: "up5", score: 4 },
+                                    { text: "0% or negative", value: "0", score: 0 }
+                                ],
+                                document: "Audited financial statements"
+                            },
+                            {
+                                id: "debt_assets",
+                                question: "Debt to Assets Ratio",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "40-50%", value: "40-50", score: 15 },
+                                    { text: "50-60%", value: "50-60", score: 10 },
+                                    { text: "30-40%", value: "30-40", score: 6 },
+                                    { text: "More than 60% or less than 30%", value: "other", score: 2 }
+                                ]
+                            },
+                            {
+                                id: "asset_turnover",
+                                question: "Investment Productivity (Asset Turnover) - Sales/Assets Ratio",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "2.0 or higher", value: "2plus", score: 15 },
+                                    { text: "1.5-2.0", value: "1.5-2", score: 12 },
+                                    { text: "1.0", value: "1", score: 8 },
+                                    { text: "Less than 1.0", value: "less1", score: 4 }
+                                ],
+                                document: "Audited financial statements"
+                            },
+                            {
+                                id: "current_ratio",
+                                question: "Current Ratio (Current Assets / Current Liabilities)",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "1.0-2.5", value: "1-2.5", score: 15 },
+                                    { text: "More than 2.5", value: "2.5plus", score: 8 },
+                                    { text: "Less than 1.0", value: "less1", score: 6 }
+                                ],
+                                document: "Audited financial statements"
+                            }
+                        ]
+                    },
+                    "People and Capability": {
+                        maxScore: 70,
+                        questions: [
+                            {
+                                id: "avg_salary",
+                                question: "Average Salary/Worker compared to minimum wage",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Equal or more than minimum wage", value: "equal", score: 15 },
+                                    { text: "Up to 25% less than minimum wage", value: "25less", score: 10 },
+                                    { text: "25-50% less than minimum wage", value: "25-50", score: 7 },
+                                    { text: "More than 50% less than minimum wage", value: "50less", score: 0 }
+                                ],
+                                document: "Audited statements"
+                            },
+                            {
+                                id: "turnover_ratio",
+                                question: "Employee Turnover Ratio (Last year)",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Less than 10%", value: "less10", score: 15 },
+                                    { text: "10-15%", value: "10-15", score: 10 },
+                                    { text: "15-20%", value: "15-20", score: 5 },
+                                    { text: "More than 20%", value: "20plus", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "mgmt_education",
+                                question: "What percentage of your management positions are occupied by persons having at least a Bachelors degree?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "50% or more", value: "50plus", score: 10 },
+                                    { text: "30-50%", value: "30-50", score: 8 },
+                                    { text: "10-30%", value: "10-30", score: 6 },
+                                    { text: "Less than 10%", value: "less10", score: 2 }
+                                ]
+                            },
+                            {
+                                id: "prod_head",
+                                question: "Is your production function headed by a person with formal technical degree?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Graduate Engineer", value: "grad", score: 10 },
+                                    { text: "Diploma Engineer", value: "diploma", score: 7 },
+                                    { text: "No technical degree", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "worker_training",
+                                question: "Do you provide formal training to your workers?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 10 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "eobi_coverage",
+                                question: "What percentage of your employees are covered under EOBI or Social Security?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than 60%", value: "60plus", score: 5 },
+                                    { text: "40-60%", value: "40-60", score: 4 },
+                                    { text: "20-40%", value: "20-40", score: 3 },
+                                    { text: "10-20%", value: "10-20", score: 1 },
+                                    { text: "Less than 10%", value: "less10", score: 0 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Operations": {
+                        maxScore: 80,
+                        questions: [
+                            {
+                                id: "capacity_util",
+                                question: "What is your current capacity utilization?",
+                                maxScore: 30,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than 80%", value: "80plus", score: 30 },
+                                    { text: "70-80%", value: "70-80", score: 25 },
+                                    { text: "60-70%", value: "60-70", score: 20 },
+                                    { text: "50-60%", value: "50-60", score: 15 },
+                                    { text: "40-50%", value: "40-50", score: 10 },
+                                    { text: "Less than 40%", value: "less40", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "market_research",
+                                question: "Do you conduct market research for your business operations?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Always", value: "always", score: 20 },
+                                    { text: "Sometimes", value: "sometimes", score: 15 },
+                                    { text: "Rarely", value: "rarely", score: 5 },
+                                    { text: "Never", value: "never", score: 0 }
+                                ],
+                                document: "Audited financial statements"
+                            },
+                            {
+                                id: "num_suppliers",
+                                question: "How many distinct suppliers provide your key raw materials?",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "6 or more", value: "6plus", score: 15 },
+                                    { text: "4-5", value: "4-5", score: 10 },
+                                    { text: "2-3", value: "2-3", score: 5 },
+                                    { text: "1", value: "1", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "local_materials",
+                                question: "How much of your key raw-materials are supplied by local (in-country) suppliers?",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "50% or more", value: "50plus", score: 15 },
+                                    { text: "40-50%", value: "40-50", score: 10 },
+                                    { text: "25-40%", value: "25-40", score: 5 },
+                                    { text: "Less than 25%", value: "less25", score: 0 }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+            "Export Performance": {
+                maxScore: 100,
+                subcategories: {
+                    "Export Performance": {
+                        maxScore: 100,
+                        questions: [
+                            {
+                                id: "total_exports",
+                                question: "Total exports (annual)",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than PKR 25 million", value: "25plus", score: 15 },
+                                    { text: "PKR 15-25 million", value: "15-25", score: 12 },
+                                    { text: "PKR 3-15 million", value: "3-15", score: 8 },
+                                    { text: "Up to PKR 3 million", value: "up3", score: 5 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "export_share",
+                                question: "Current Share of Exports as % of Total Revenue",
+                                maxScore: 25,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "50% or more", value: "50plus", score: 25 },
+                                    { text: "40-50%", value: "40-50", score: 15 },
+                                    { text: "30-40%", value: "30-40", score: 10 },
+                                    { text: "Up to 30%", value: "up30", score: 5 },
+                                    { text: "0%", value: "0", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "export_diversification",
+                                question: "How many products (at 4-digit HS code) did you export last year?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "5 or more products", value: "5plus", score: 20 },
+                                    { text: "3-4 products", value: "3-4", score: 15 },
+                                    { text: "2 products", value: "2", score: 10 },
+                                    { text: "1 product", value: "1", score: 5 },
+                                    { text: "0 products", value: "0", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "export_markets",
+                                question: "How many export markets (countries) did you export to last year?",
+                                maxScore: 25,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "6 or more markets", value: "6plus", score: 25 },
+                                    { text: "4-5 markets", value: "4-5", score: 20 },
+                                    { text: "2-3 markets", value: "2-3", score: 15 },
+                                    { text: "1 market", value: "1", score: 10 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "premium_markets",
+                                question: "Did you export to EU, USA or Japan market during last three years?",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 15 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+            "Export Readiness": {
+                maxScore: 400,
+                subcategories: {
+                    "Internal Capacity": {
+                        maxScore: 40,
+                        questions: [
+                            {
+                                id: "export_fulfill",
+                                question: "Can your export orders be fulfilled using your internal machinery & equipment and systems?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes, completely", value: "yes", score: 10 },
+                                    { text: "Partly", value: "partly", score: 5 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "subcontractor_network",
+                                question: "Do you have a network of subcontractors through which you can fulfil your export order?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Very strong network", value: "vstrong", score: 10 },
+                                    { text: "Good network", value: "good", score: 10 },
+                                    { text: "Weak network", value: "weak", score: 5 },
+                                    { text: "No network", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "export_dept",
+                                question: "How would any new or additional export business be handled within your organization?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Establish/have separate export department", value: "separate", score: 15 },
+                                    { text: "Hire more staff in same departments", value: "hire", score: 12 },
+                                    { text: "Use existing manpower strength", value: "existing", score: 5 }
+                                ]
+                            },
+                            {
+                                id: "training_req",
+                                question: "Is any special training required to produce and supply your export order?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "No special training", value: "no", score: 10 },
+                                    { text: "Some training", value: "some", score: 5 },
+                                    { text: "Extensive training", value: "extensive", score: 0 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Product": {
+                        maxScore: 35,
+                        questions: [
+                            {
+                                id: "hs_code_awareness",
+                                question: "Are you aware of the 6-digit HS codes of the products you want to export?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Fully aware", value: "fully", score: 10 },
+                                    { text: "Partly aware", value: "partly", score: 7 },
+                                    { text: "Little aware", value: "little", score: 3 },
+                                    { text: "Not aware", value: "not", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "competitive_advantage",
+                                question: "Does your product have a distinct competitive advantage (quality, price, uniqueness, innovation) over your competition in your target export market?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Strong competitive advantage", value: "strong", score: 10 },
+                                    { text: "Average competitive advantage", value: "average", score: 5 },
+                                    { text: "No competitive advantage", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "packaging_awareness",
+                                question: "Are you aware of the packaging and labeling requirements of your target export market?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Fully aware", value: "fully", score: 5 },
+                                    { text: "Partly aware", value: "partly", score: 4 },
+                                    { text: "Little aware", value: "little", score: 2 },
+                                    { text: "Not aware", value: "not", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "product_adaptation",
+                                question: "Would you be willing to adapt your product and/or packaging/labeling to better suit foreign markets?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Very willing", value: "vwilling", score: 6 },
+                                    { text: "Willing", value: "willing", score: 4 },
+                                    { text: "Reluctantly", value: "reluctant", score: 2 },
+                                    { text: "Unwilling", value: "unwilling", score: 0 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Export Planning": {
+                        maxScore: 125,
+                        questions: [
+                            {
+                                id: "export_plan",
+                                question: "Do you have a written export plan showing products, countries, pricing, channels, etc.?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "A detailed plan is available", value: "detailed", score: 3 },
+                                    { text: "A rough plan is available", value: "rough", score: 2 },
+                                    { text: "Only an idea is there", value: "idea", score: 1 },
+                                    { text: "No plan is available", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "communication_plan",
+                                question: "Do you have a market communication plan to make your product known in export market?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 2 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "promo_material",
+                                question: "Does your firm have promotional material in English or other international language?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 5 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "export_cost_calc",
+                                question: "Have you calculated the cost of exporting, while considering all cost heads?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 3 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "profitability_assessment",
+                                question: "Have you done your assessment on how exporting to a new or existing market will affect your overall profitability?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 2 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "test_marketing",
+                                question: "Have you started test marketing your product in the target market?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 2 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "market_research_export",
+                                question: "Have you done market research for export business?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Done some primary and secondary research", value: "both", score: 10 },
+                                    { text: "Done only secondary research", value: "secondary", score: 6 },
+                                    { text: "No market research", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "itc_trademap",
+                                question: "Are you aware of ITC Trade Map?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 5 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "agent_dest",
+                                question: "Do you have an Agent or representative or office in the destination market?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 10 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_fair_participation",
+                                question: "Have you participated in at least one international trade fair during the last two years?",
+                                maxScore: 12,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 12 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_fair_deals",
+                                question: "Were you able to close deals at an international trade fair?",
+                                maxScore: 8,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 8 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "export_order_knowledge",
+                                question: "Do you know about ways to get export orders?",
+                                maxScore: 8,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Full knowledge", value: "full", score: 6 },
+                                    { text: "Partial knowledge", value: "partial", score: 4 },
+                                    { text: "Very little knowledge", value: "little", score: 2 },
+                                    { text: "No knowledge", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "unsolicited_inquiries",
+                                question: "Has your firm received any unsolicited inquiries from foreign firms?",
+                                maxScore: 6,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Many", value: "many", score: 5 },
+                                    { text: "Some", value: "some", score: 3 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "international_enquiries",
+                                question: "Have you made international enquiries to obtain export orders?",
+                                maxScore: 6,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 4 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "website_presence",
+                                question: "Does your business have an operational website or online presence to attract international customers?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 10 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "social_media",
+                                question: "Do you have an operational Facebook/Instagram page?",
+                                maxScore: 8,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 8 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "b2b_directories",
+                                question: "Do you have membership of at least one international buyer/supplier directories/platforms?",
+                                maxScore: 7,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 7 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Finance": {
+                        maxScore: 40,
+                        questions: [
+                            {
+                                id: "payment_mechanisms",
+                                question: "Are you aware of export payment mechanisms?",
+                                maxScore: 8,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 8 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "payment_terms",
+                                question: "What payment terms would you be willing to accept from foreign buyers?",
+                                maxScore: 7,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Pay in advance", value: "advance", score: 7 },
+                                    { text: "Pay on delivery", value: "delivery", score: 6 },
+                                    { text: "Up to 30 days", value: "30", score: 5 },
+                                    { text: "31-60 days", value: "60", score: 4 },
+                                    { text: "61-120 days", value: "120", score: 3 },
+                                    { text: "Over 120 days", value: "120plus", score: 2 }
+                                ]
+                            },
+                            {
+                                id: "capital_calculation",
+                                question: "Have you made calculations to know how much capital is needed to begin/continue exporting?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Detailed calculations", value: "detailed", score: 5 },
+                                    { text: "Rough calculations", value: "rough", score: 2 },
+                                    { text: "No calculations", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "product_modification_finance",
+                                question: "Do you have resources to modify (if required) your product to suit overseas customers and standards?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Financing available", value: "available", score: 5 },
+                                    { text: "Being arranged", value: "arranging", score: 2 },
+                                    { text: "No financing available", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "marketing_budget",
+                                question: "How much money can your firm spend on export marketing?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "3% and above of revenues", value: "3plus", score: 5 },
+                                    { text: "1-2% of revenues", value: "1-2", score: 4 },
+                                    { text: "Up to 1% of revenues", value: "up1", score: 3 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "bank_financing",
+                                question: "Do you currently get bank financing for export from your local bank?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 5 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "refinance_scheme",
+                                question: "Have you previously obtained finance through Export Refinance Scheme?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 5 },
+                                    { text: "No / Do not have knowledge", value: "no", score: 0 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Regulatory & Other Compliances": {
+                        maxScore: 80,
+                        questions: [
+                            {
+                                id: "legal_requirements",
+                                question: "Are you aware of the legal and regulatory requirements to export your product in the target market?",
+                                maxScore: 7,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Fully aware", value: "fully", score: 7 },
+                                    { text: "Partly aware", value: "partly", score: 5 },
+                                    { text: "Little aware", value: "little", score: 3 },
+                                    { text: "Not aware", value: "not", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_agreements",
+                                question: "Are you aware of any bilateral or multilateral trade agreements related to your product or country of interest?",
+                                maxScore: 7,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "All of them", value: "all", score: 7 },
+                                    { text: "Some of them", value: "some", score: 4 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "govt_incentives",
+                                question: "Do you know of incentives offered by the government for exporting your product?",
+                                maxScore: 6,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "All of them", value: "all", score: 6 },
+                                    { text: "Some of them", value: "some", score: 3 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "iso_9001",
+                                question: "Do you have valid ISO 9001 certification?",
+                                maxScore: 6,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 6 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "social_compliance",
+                                question: "How many valid social compliance certifications do you have?",
+                                maxScore: 12,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "2 or more", value: "2plus", score: 12 },
+                                    { text: "1", value: "1", score: 8 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "hse_compliance",
+                                question: "How many valid HSE compliance certifications do you have?",
+                                maxScore: 12,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "2 or more", value: "2plus", score: 12 },
+                                    { text: "1", value: "1", score: 8 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "sector_certifications",
+                                question: "How many valid sector-specific compliance certifications do you have?",
+                                maxScore: 30,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "3 or more", value: "3plus", score: 30 },
+                                    { text: "2", value: "2", score: 20 },
+                                    { text: "1", value: "1", score: 10 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Export Processes": {
+                        maxScore: 40,
+                        questions: [
+                            {
+                                id: "logistics_knowledge",
+                                question: "Do you have adequate knowledge about export-related logistics?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Complete knowledge", value: "complete", score: 5 },
+                                    { text: "Partial knowledge", value: "partial", score: 4 },
+                                    { text: "Very little knowledge", value: "little", score: 2 },
+                                    { text: "No knowledge", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "transport_plan",
+                                question: "Do you have a plan for how your products will be transported from the factory/warehouse to the buyer's destination?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "A detailed plan is available", value: "detailed", score: 5 },
+                                    { text: "A rough plan is available", value: "rough", score: 2 },
+                                    { text: "No plan is available", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "logistics_costs",
+                                question: "Do you know how to calculate logistics costs (freight, insurance, port charges, inland transport) for exports?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 5 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "shipping_experience",
+                                question: "Do you have experience with international shipping, freight forwarding, and customs clearance?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Rich experience", value: "rich", score: 5 },
+                                    { text: "Little experience", value: "little", score: 3 },
+                                    { text: "No experience", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "documentation_knowledge",
+                                question: "Do you have knowledge about export-related documentation?",
+                                maxScore: 7,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Complete knowledge", value: "complete", score: 10 },
+                                    { text: "Partial knowledge", value: "partial", score: 7 },
+                                    { text: "Very little knowledge", value: "little", score: 3 },
+                                    { text: "No knowledge", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "weboc_psw",
+                                question: "Do you have knowledge about WeBOC and Pakistan Single Window (PSW) for filing documentation?",
+                                maxScore: 7,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Complete knowledge", value: "complete", score: 10 },
+                                    { text: "Partial knowledge", value: "partial", score: 7 },
+                                    { text: "Very little knowledge", value: "little", score: 3 },
+                                    { text: "No knowledge", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trained_staff",
+                                question: "Are there dedicated staff members in your firm who are trained in handling export documentation?",
+                                maxScore: 6,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 5 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        };
 
-    // Form submission handler
-    document.getElementById('filterForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      
-      // Get form values
-      const amount = parseFloat(document.getElementById('amount').value);
-      const horizon = document.getElementById('horizon').value;
-      const risk = document.getElementById('risk').value;
-      
-      // Filter and sort investments
-      let filteredOptions = investmentOptions;
-      
-      // Filter by risk if not "All"
-      if (risk) {
-        filteredOptions = investmentOptions.filter(option => option.risk === risk);
-      }
-      
-      // Sort by best return for selected horizon
-      filteredOptions.sort((a, b) => b.returns[horizon] - a.returns[horizon]);
-      
-      // Generate table rows
-      const resultsBody = document.getElementById('resultsBody');
-      resultsBody.innerHTML = '';
-      
-      filteredOptions.forEach(option => {
-        const row = document.createElement('tr');
-        row.className = 'hover:bg-rh-light transition';
-        
-        // Calculate projected value
-        const returnRate = option.returns[horizon] / 100;
-        const years = parseInt(horizon);
-        const projectedValue = amount * Math.pow(1 + returnRate, years);
-        
-        // Format numbers with commas
-        const formattedValue = projectedValue.toLocaleString('en-PK', {
-          maximumFractionDigits: 0,
-          style: 'currency',
-          currency: 'PKR'
-        }).replace('PKR', '₨');
-        
-        row.innerHTML = `
-          <td class="px-6 py-4 text-left font-medium text-rh-dark">${option.type}</td>
-          <td class="px-6 py-4 text-left">
-            <span class="px-2 py-1 text-xs rounded-full ${
-              option.risk === 'High' ? 'bg-red-100 text-red-800' : 
-              option.risk === 'Medium' ? 'bg-amber-100 text-amber-800' : 
-              'bg-green-100 text-green-800'
-            }">
-              ${option.risk}
-            </span>
-          </td>
-          <td class="px-6 py-4 text-right font-medium ${option.returns['1'] > 0 ? 'text-rh-positive' : 'text-rh-negative'}">
-            ${option.returns['1']}%
-          </td>
-          <td class="px-6 py-4 text-right font-medium ${option.returns['3'] > 0 ? 'text-rh-positive' : 'text-rh-negative'}">
-            ${option.returns['3']}%
-          </td>
-          <td class="px-6 py-4 text-right font-medium ${option.returns['5'] > 0 ? 'text-rh-positive' : 'text-rh-negative'}">
-            ${option.returns['5']}%
-          </td>
-          <td class="px-6 py-4 text-right font-bold text-rh-dark positive-change">
-            ${formattedValue}
-          </td>
-        `;
-        
-        resultsBody.appendChild(row);
-      });
-    });
-  </script>
+        let currentCompanyType = '';
+        let currentQuestions = {};
+        let currentCategoryIndex = 0;
+        let answers = {};
+        let categoryScores = {};
+
+        function selectCompanyType(type) {
+            if (type === 'manufacturing') {
+                currentCompanyType = type;
+                currentQuestions = manufacturingQuestions;
+                document.getElementById('companyTypeSection').style.display = 'none';
+                generateQuestions();
+                showCategory(0);
+            } else {
+                alert('Coming soon! Currently only Manufacturing evaluation is available.');
+            }
+        }
+
+        function generateQuestions() {
+            const container = document.getElementById('questionsContainer');
+            const categories = Object.keys(currentQuestions);
+            
+            categories.forEach((categoryName, categoryIndex) => {
+                const category = currentQuestions[categoryName];
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'question-section';
+                categoryDiv.id = `category-${categoryIndex}`;
+                
+                let html = `
+                    <div class="category-header">
+                        <div>
+                            <h2>${categoryName}</h2>
+                            <p style="opacity: 0.7; margin-top: 5px; font-size: 13px; font-weight: 400;">Maximum Score: ${category.maxScore} points</p>
+                        </div>
+                        <div class="category-score">Section ${categoryIndex + 1} of ${categories.length}</div>
+                    </div>
+                `;
+                
+                Object.keys(category.subcategories).forEach((subCatName) => {
+                    const subCat = category.subcategories[subCatName];
+                    html += `
+                        <h3 style="color: #1a1a1a; margin: 30px 0 20px 0; font-size: 17px; font-weight: 600; padding-bottom: 12px; border-bottom: 2px solid #e5e7eb;">
+                            ${subCatName} <span class="question-score">${subCat.maxScore} points</span>
+                        </h3>
+                    `;
+                    
+                    subCat.questions.forEach((question, qIndex) => {
+                        html += `
+                            <div class="question-card">
+                                <div class="question-text">
+                                    ${question.question}
+                                    <span class="question-score">${question.maxScore} pts</span>
+                                </div>
+                                ${generateQuestionInput(question, categoryIndex, qIndex)}
+                                ${question.document ? `
+                                    <div class="file-upload-section">
+                                        <label class="file-upload-label">Upload supporting document (${question.document})</label>
+                                        <input type="file" id="file_${question.id}" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    });
+                });
+                
+                html += `
+                    <div class="navigation-buttons">
+                        ${categoryIndex > 0 ? `<button class="btn btn-secondary" onclick="previousCategory()">← Previous</button>` : '<div></div>'}
+                        ${categoryIndex < categories.length - 1 ? 
+                            `<button class="btn btn-primary" onclick="nextCategory()">Next →</button>` :
+                            `<button class="btn btn-primary" onclick="showResults()">View Results</button>`
+                        }
+                    </div>
+                `;
+                
+                categoryDiv.innerHTML = html;
+                container.appendChild(categoryDiv);
+            });
+        }
+
+        function generateQuestionInput(question, catIndex, qIndex) {
+            if (question.type === 'select') {
+                let html = `<select id="${question.id}" onchange="updateScore('${question.id}')">`;
+                question.options.forEach(opt => {
+                    html += `<option value="${opt.value}" data-score="${opt.score}">${opt.text}</option>`;
+                });
+                html += `</select>`;
+                return html;
+            }
+            return '';
+        }
+
+        function updateScore(questionId) {
+            const select = document.getElementById(questionId);
+            const selectedOption = select.options[select.selectedIndex];
+            const score = parseInt(selectedOption.getAttribute('data-score')) || 0;
+            
+            answers[questionId] = {
+                value: select.value,
+                score: score
+            };
+            
+            calculateTotalScore();
+        }
+
+        function calculateTotalScore() {
+            let totalScore = 0;
+            categoryScores = {};
+            
+            Object.keys(currentQuestions).forEach(categoryName => {
+                categoryScores[categoryName] = 0;
+                const category = currentQuestions[categoryName];
+                
+                Object.keys(category.subcategories).forEach(subCatName => {
+                    category.subcategories[subCatName].questions.forEach(question => {
+                        if (answers[question.id]) {
+                            totalScore += answers[question.id].score;
+                            categoryScores[categoryName] += answers[question.id].score;
+                        }
+                    });
+                });
+            });
+            
+            document.getElementById('currentScore').textContent = totalScore;
+            const percentage = (totalScore / 1000 * 100).toFixed(1);
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = percentage + '%';
+            progressBar.setAttribute('data-percent', percentage + '%');
+        }
+
+        function showCategory(index) {
+            document.querySelectorAll('.question-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            const categoryElement = document.getElementById(`category-${index}`);
+            if (categoryElement) {
+                categoryElement.classList.add('active');
+                currentCategoryIndex = index;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        function nextCategory() {
+            showCategory(currentCategoryIndex + 1);
+        }
+
+        function previousCategory() {
+            showCategory(currentCategoryIndex - 1);
+        }
+
+        function showResults() {
+            calculateTotalScore();
+            
+            document.getElementById('questionsContainer').style.display = 'none';
+            
+            const totalScore = Object.values(answers).reduce((sum, answer) => sum + answer.score, 0);
+            document.getElementById('finalScore').textContent = totalScore;
+            
+            let breakdownHTML = '<h3 style="margin-bottom: 20px; color: #333;">Score Breakdown by Category</h3>';
+            Object.keys(categoryScores).forEach(categoryName => {
+                const categoryMax = currentQuestions[categoryName].maxScore;
+                const categoryScore = categoryScores[categoryName];
+                const percentage = ((categoryScore / categoryMax) * 100).toFixed(1);
+                
+                breakdownHTML += `
+                    <div class="breakdown-item">
+                        <span class="breakdown-category">${categoryName}</span>
+                        <span class="breakdown-score">${categoryScore} / ${categoryMax} (${percentage}%)</span>
+                    </div>
+                `;
+            });
+            
+            document.getElementById('scoreBreakdown').innerHTML = breakdownHTML;
+            document.getElementById('resultsSection').classList.add('active');
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    </script>
 </body>
 </html>
