@@ -480,7 +480,7 @@
                     </button>
                 </div>
                 <div class="note" style="margin-top: 40px;">
-                    <strong>Note:</strong> Currently, only Manufacturing evaluation is available. Trading and Services evaluations will be added soon.
+                    <strong>Note:</strong> All three evaluation types (Manufacturing, Trading, and Services) are now available. Select your company type to begin the assessment.
                 </div>
             </div>
 
@@ -1593,6 +1593,2017 @@
             }
         };
 
+        // Trading questions data
+        const tradingQuestions = {
+            "Firm's Capacity": {
+                maxScore: 250,
+                subcategories: {
+                    "Business Structure": {
+                        maxScore: 80,
+                        questions: [
+                            {
+                                id: "trade_edu_level",
+                                question: "What is your highest completed level of education?",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Bachelors & above", value: "bachelors", score: 15 },
+                                    { text: "Up to 12th grade", value: "12th", score: 8 },
+                                    { text: "Under matric", value: "under_matric", score: 5 }
+                                ],
+                                document: "Educational Certificates"
+                            },
+                            {
+                                id: "trade_business_exp",
+                                question: "How many years of business experience do you have?",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than 15 years", value: "15plus", score: 15 },
+                                    { text: "10-15 years", value: "10-15", score: 12 },
+                                    { text: "5-10 years", value: "5-10", score: 8 },
+                                    { text: "Less than 5 years", value: "less5", score: 5 }
+                                ],
+                                document: "Certificate"
+                            },
+                            {
+                                id: "trade_legal_form",
+                                question: "What is the legal form of your organization?",
+                                maxScore: 30,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Private Limited Company", value: "pvt_ltd", score: 30 },
+                                    { text: "Registered Partnership", value: "reg_partnership", score: 25 },
+                                    { text: "Unregistered Partnership", value: "unreg_partnership", score: 10 },
+                                    { text: "Sole Proprietorship", value: "sole", score: 5 }
+                                ],
+                                document: "Registration documents"
+                            },
+                            {
+                                id: "trade_chamber_membership",
+                                question: "Do you have membership of Chamber of Commerce & Industry?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 10 },
+                                    { text: "No", value: "no", score: 0 }
+                                ],
+                                document: "Membership certificates"
+                            },
+                            {
+                                id: "trade_sector_membership",
+                                question: "Do you have membership of sector association(s)?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 10 },
+                                    { text: "No", value: "no", score: 0 }
+                                ],
+                                document: "Membership certificates"
+                            }
+                        ]
+                    },
+                    "Technical Capacity/Innovation": {
+                        maxScore: 120,
+                        questions: [
+                            {
+                                id: "trade_warehouse_age",
+                                question: "How old is majority of your warehousing and material handling Equipment?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Up to 5 years old", value: "5", score: 20 },
+                                    { text: "5-15 years old", value: "5-15", score: 10 },
+                                    { text: "More than 15 years old", value: "15plus", score: 5 }
+                                ]
+                            },
+                            {
+                                id: "trade_tech_status",
+                                question: "What is the status of your warehousing and trading technology systems (barcodes, POS systems, supply chain automation, etc.) with respect to your local competitors?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Most advanced", value: "most", score: 20 },
+                                    { text: "Advanced", value: "advanced", score: 15 },
+                                    { text: "Normal", value: "normal", score: 10 },
+                                    { text: "Basic", value: "basic", score: 5 }
+                                ]
+                            },
+                            {
+                                id: "trade_equipment_investment",
+                                question: "How much have you invested on machinery, equipment and warehousing during the last three years (as % of revenue)?",
+                                maxScore: 25,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than 7%", value: "7plus", score: 25 },
+                                    { text: "6-7%", value: "6-7", score: 15 },
+                                    { text: "5-6%", value: "5-6", score: 10 },
+                                    { text: "Less than 5%", value: "less5", score: 5 },
+                                    { text: "None", value: "none", score: 0 }
+                                ],
+                                document: "Audited financial statements"
+                            },
+                            {
+                                id: "trade_software_systems",
+                                question: "What type of system is used by your business to manage operations?",
+                                maxScore: 30,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Fully integrated ERP system", value: "erp", score: 40 },
+                                    { text: "MIS with some analysis & decision making", value: "mis", score: 25 },
+                                    { text: "Basic record keeping systems", value: "basic", score: 10 },
+                                    { text: "Manual accounting system", value: "manual", score: 5 }
+                                ]
+                            },
+                            {
+                                id: "trade_warehouse_systems",
+                                question: "Do you use integrated warehousing, goods/material handling systems for your trading operations?",
+                                maxScore: 25,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Advanced systems", value: "advanced", score: 25 },
+                                    { text: "Basic systems", value: "basic", score: 15 },
+                                    { text: "Manual systems", value: "manual", score: 5 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Quality Assurance Infrastructure": {
+                        maxScore: 50,
+                        questions: [
+                            {
+                                id: "trade_qa_dept",
+                                question: "Do you have a dedicated quality assurance/control department or staff?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 20 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_qa_equipment",
+                                question: "Do you have required control equipment/tools to ensure the quality of your services?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 10 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_qa_docs",
+                                question: "Do you have documented quality control systems and procedures (manuals)?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 15 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+            "Business Performance": {
+                maxScore: 250,
+                subcategories: {
+                    "Financial Performance": {
+                        maxScore: 100,
+                        questions: [
+                            {
+                                id: "trade_revenue_avg",
+                                question: "Average Revenue (Sales) - Last 3 years",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "PKR 500-800 million", value: "500-800", score: 15 },
+                                    { text: "PKR 150-500 million", value: "150-500", score: 12 },
+                                    { text: "PKR 100-150 million", value: "100-150", score: 10 },
+                                    { text: "PKR 50-100 million", value: "50-100", score: 8 },
+                                    { text: "Up to PKR 50 million", value: "up50", score: 6 }
+                                ],
+                                document: "Audited financial statements"
+                            },
+                            {
+                                id: "trade_revenue_growth",
+                                question: "Average Revenue Growth Rate (Last 3 years)",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than 20%", value: "20plus", score: 20 },
+                                    { text: "15-20%", value: "15-20", score: 16 },
+                                    { text: "10-15%", value: "10-15", score: 12 },
+                                    { text: "5-10%", value: "5-10", score: 8 },
+                                    { text: "Up to 5%", value: "up5", score: 4 },
+                                    { text: "0% or below", value: "0", score: 0 }
+                                ],
+                                document: "Audited financial statements"
+                            },
+                            {
+                                id: "trade_net_income_margin",
+                                question: "Net Income Margin (Average)",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than 15%", value: "15plus", score: 20 },
+                                    { text: "12-15%", value: "12-15", score: 16 },
+                                    { text: "10-12%", value: "10-12", score: 12 },
+                                    { text: "5-10%", value: "5-10", score: 8 },
+                                    { text: "Up to 5%", value: "up5", score: 4 },
+                                    { text: "0% or negative", value: "0", score: 0 }
+                                ],
+                                document: "Audited financial statements"
+                            },
+                            {
+                                id: "trade_debt_assets",
+                                question: "Debt to Assets Ratio",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "30-40%", value: "30-40", score: 15 },
+                                    { text: "40-50%", value: "40-50", score: 10 },
+                                    { text: "20-30%", value: "20-30", score: 6 },
+                                    { text: "More than 50% or less than 20%", value: "other", score: 2 }
+                                ]
+                            },
+                            {
+                                id: "trade_asset_turnover",
+                                question: "Investment Productivity (Asset Turnover) - Sales/Assets Ratio",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "3.0 or higher", value: "3plus", score: 15 },
+                                    { text: "2.5-3.0", value: "2.5-3", score: 12 },
+                                    { text: "2.0", value: "2", score: 8 },
+                                    { text: "Less than 2.0", value: "less2", score: 4 }
+                                ],
+                                document: "Audited financial statements"
+                            },
+                            {
+                                id: "trade_current_ratio",
+                                question: "Current Ratio (Current Assets / Current Liabilities)",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "1.0-2.0", value: "1-2", score: 15 },
+                                    { text: "More than 2.0", value: "2plus", score: 8 },
+                                    { text: "Less than 1.0", value: "less1", score: 6 }
+                                ],
+                                document: "Audited financial statements"
+                            }
+                        ]
+                    },
+                    "People and Capability": {
+                        maxScore: 70,
+                        questions: [
+                            {
+                                id: "trade_avg_salary",
+                                question: "Average Salary/Worker compared to minimum wage",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Equal or more than minimum wage", value: "equal", score: 15 },
+                                    { text: "Up to 25% less than minimum wage", value: "25less", score: 10 },
+                                    { text: "25-50% less than minimum wage", value: "25-50", score: 7 },
+                                    { text: "More than 50% less than minimum wage", value: "50less", score: 0 }
+                                ],
+                                document: "Audited statements"
+                            },
+                            {
+                                id: "trade_turnover_ratio",
+                                question: "Employee Turnover Ratio (Last year)",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Less than 10%", value: "less10", score: 15 },
+                                    { text: "10-15%", value: "10-15", score: 10 },
+                                    { text: "15-20%", value: "15-20", score: 5 },
+                                    { text: "More than 20%", value: "20plus", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_mgmt_education",
+                                question: "What percentage of your management positions are occupied by persons having at least a Bachelors degree?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "50% or more", value: "50plus", score: 10 },
+                                    { text: "30-50%", value: "30-50", score: 8 },
+                                    { text: "10-30%", value: "10-30", score: 6 },
+                                    { text: "Less than 10%", value: "less10", score: 2 }
+                                ]
+                            },
+                            {
+                                id: "trade_operations_head",
+                                question: "Is your Operations function headed by a person with degree or diploma?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Graduate", value: "grad", score: 10 },
+                                    { text: "Diploma Holder", value: "diploma", score: 7 },
+                                    { text: "No degree", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_worker_training",
+                                question: "Do you provide formal training to your workers?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 10 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_eobi_coverage",
+                                question: "What percentage of your employees are covered under EOBI or Social Security?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than 60%", value: "60plus", score: 5 },
+                                    { text: "40-60%", value: "40-60", score: 4 },
+                                    { text: "20-40%", value: "20-40", score: 3 },
+                                    { text: "10-20%", value: "10-20", score: 1 },
+                                    { text: "Less than 10%", value: "less10", score: 0 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Operations": {
+                        maxScore: 80,
+                        questions: [
+                            {
+                                id: "trade_capacity_util",
+                                question: "What is your current trading capacity utilization? (operational throughput)",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than 70%", value: "70plus", score: 20 },
+                                    { text: "60-70%", value: "60-70", score: 15 },
+                                    { text: "50-60%", value: "50-60", score: 10 },
+                                    { text: "40-50%", value: "40-50", score: 5 },
+                                    { text: "Less than 40%", value: "less40", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_market_research",
+                                question: "Do you conduct market research for your business operations?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Always", value: "always", score: 20 },
+                                    { text: "Sometimes", value: "sometimes", score: 15 },
+                                    { text: "Rarely", value: "rarely", score: 5 },
+                                    { text: "Never", value: "never", score: 0 }
+                                ],
+                                document: "Audited financial statements"
+                            },
+                            {
+                                id: "trade_num_suppliers",
+                                question: "What is the average number of suppliers you work with?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "10 or more", value: "10plus", score: 20 },
+                                    { text: "7-9", value: "7-9", score: 15 },
+                                    { text: "4-6", value: "4-6", score: 10 },
+                                    { text: "2-3", value: "2-3", score: 5 },
+                                    { text: "1", value: "1", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_reexports",
+                                question: "Do you also re-export goods after importing?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 20 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+            "Export Performance": {
+                maxScore: 100,
+                subcategories: {
+                    "Export Performance": {
+                        maxScore: 100,
+                        questions: [
+                            {
+                                id: "trade_total_exports",
+                                question: "Total exports (annual)",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than PKR 25 million", value: "25plus", score: 15 },
+                                    { text: "PKR 15-25 million", value: "15-25", score: 12 },
+                                    { text: "PKR 3-15 million", value: "3-15", score: 8 },
+                                    { text: "Up to PKR 3 million", value: "up3", score: 5 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_export_share",
+                                question: "Current Share of Exports as % of Total Revenue",
+                                maxScore: 25,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "60% or more", value: "60plus", score: 25 },
+                                    { text: "50-60%", value: "50-60", score: 15 },
+                                    { text: "40-50%", value: "40-50", score: 10 },
+                                    { text: "Up to 40%", value: "up40", score: 5 },
+                                    { text: "0%", value: "0", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_export_diversification",
+                                question: "How many products (at 4-digit HS code) did you export last year?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "8 or more products", value: "8plus", score: 20 },
+                                    { text: "5-7 products", value: "5-7", score: 15 },
+                                    { text: "3-4 products", value: "3-4", score: 10 },
+                                    { text: "Up to 3 products", value: "up3", score: 5 },
+                                    { text: "0 products", value: "0", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_export_markets",
+                                question: "How many export markets (countries) did you export to last year?",
+                                maxScore: 25,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "8 or more markets", value: "8plus", score: 25 },
+                                    { text: "5-7 markets", value: "5-7", score: 20 },
+                                    { text: "3-4 markets", value: "3-4", score: 15 },
+                                    { text: "1-2 markets", value: "1-2", score: 10 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_premium_markets",
+                                question: "Did you export to EU, USA or Japan market during last three years?",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 15 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+            "Export Readiness": {
+                maxScore: 400,
+                subcategories: {
+                    "Internal Capacity": {
+                        maxScore: 40,
+                        questions: [
+                            {
+                                id: "trade_export_fulfill",
+                                question: "Can your export orders be fulfilled using your internal systems and capacity?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes, completely", value: "yes", score: 10 },
+                                    { text: "Partly", value: "partly", score: 5 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_subcontractor_network",
+                                question: "Do you have a network of suppliers through which you can fulfil your export order?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Very strong network", value: "vstrong", score: 10 },
+                                    { text: "Good network", value: "good", score: 10 },
+                                    { text: "Weak network", value: "weak", score: 5 },
+                                    { text: "No network", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_export_dept",
+                                question: "How would any new or additional export business be handled within your organization?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Establish/have separate export department", value: "separate", score: 15 },
+                                    { text: "Hire more staff in same departments", value: "hire", score: 12 },
+                                    { text: "Use existing manpower strength", value: "existing", score: 5 }
+                                ]
+                            },
+                            {
+                                id: "trade_training_req",
+                                question: "Is any special training required to handle your export orders?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "No special training", value: "no", score: 10 },
+                                    { text: "Some training", value: "some", score: 5 },
+                                    { text: "Extensive training", value: "extensive", score: 0 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Product": {
+                        maxScore: 35,
+                        questions: [
+                            {
+                                id: "trade_hs_code_awareness",
+                                question: "Are you aware of the 6-digit HS codes of the products you want to export?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Fully aware", value: "fully", score: 10 },
+                                    { text: "Partly aware", value: "partly", score: 7 },
+                                    { text: "Little aware", value: "little", score: 3 },
+                                    { text: "Not aware", value: "not", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_competitive_advantage",
+                                question: "Does your product have a distinct competitive advantage (quality, price, uniqueness) over your competition in your target export market?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Strong competitive advantage", value: "strong", score: 10 },
+                                    { text: "Average competitive advantage", value: "average", score: 5 },
+                                    { text: "No competitive advantage", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_packaging_awareness",
+                                question: "Are you aware of the packaging and labeling requirements of your target export market?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Fully aware", value: "fully", score: 5 },
+                                    { text: "Partly aware", value: "partly", score: 4 },
+                                    { text: "Little aware", value: "little", score: 2 },
+                                    { text: "Not aware", value: "not", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_product_adaptation",
+                                question: "Would you be willing to adapt your product and/or packaging/labeling to better suit foreign markets?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Very willing", value: "vwilling", score: 6 },
+                                    { text: "Willing", value: "willing", score: 4 },
+                                    { text: "Reluctantly", value: "reluctant", score: 2 },
+                                    { text: "Unwilling", value: "unwilling", score: 0 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Export Planning": {
+                        maxScore: 125,
+                        questions: [
+                            {
+                                id: "trade_export_plan",
+                                question: "Do you have a written export plan showing products, countries, pricing, channels, etc.?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "A detailed plan is available", value: "detailed", score: 3 },
+                                    { text: "A rough plan is available", value: "rough", score: 2 },
+                                    { text: "Only an idea is there", value: "idea", score: 1 },
+                                    { text: "No plan is available", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_communication_plan",
+                                question: "Do you have a market communication plan to make your product known in export market?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 2 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_promo_material",
+                                question: "Does your firm have promotional material in English or other international language?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 5 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_export_cost_calc",
+                                question: "Have you calculated the cost of exporting, while considering all cost heads?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 3 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_profitability_assessment",
+                                question: "Have you done your assessment on how exporting will affect your overall profitability?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 2 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_test_marketing",
+                                question: "Have you started test marketing your product in the target market?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 2 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_market_research_export",
+                                question: "Have you done market research for export business?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Done some primary and secondary research", value: "both", score: 10 },
+                                    { text: "Done only secondary research", value: "secondary", score: 6 },
+                                    { text: "No market research", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_itc_trademap",
+                                question: "Are you aware of ITC Trade Map?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 5 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_agent_dest",
+                                question: "Do you have an Agent or representative or office in the destination market?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 10 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_trade_fair_participation",
+                                question: "Have you participated in at least one international trade fair during the last two years?",
+                                maxScore: 12,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 12 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_trade_fair_deals",
+                                question: "Were you able to close deals at an international trade fair?",
+                                maxScore: 8,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 8 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_export_order_knowledge",
+                                question: "Do you know about ways to get export orders?",
+                                maxScore: 8,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Full knowledge", value: "full", score: 6 },
+                                    { text: "Partial knowledge", value: "partial", score: 4 },
+                                    { text: "Very little knowledge", value: "little", score: 2 },
+                                    { text: "No knowledge", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_unsolicited_inquiries",
+                                question: "Has your firm received any unsolicited inquiries from foreign firms?",
+                                maxScore: 6,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Many", value: "many", score: 5 },
+                                    { text: "Some", value: "some", score: 3 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_international_enquiries",
+                                question: "Have you made international enquiries to obtain export orders?",
+                                maxScore: 6,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 4 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_website_presence",
+                                question: "Does your business have an operational website or online presence to attract international customers?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 10 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_social_media",
+                                question: "Do you have an operational Facebook/Instagram page?",
+                                maxScore: 8,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 8 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_b2b_directories",
+                                question: "Do you have membership of at least one international buyer/supplier directories/platforms?",
+                                maxScore: 7,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 7 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Finance": {
+                        maxScore: 40,
+                        questions: [
+                            {
+                                id: "trade_payment_mechanisms",
+                                question: "Are you aware of export payment mechanisms?",
+                                maxScore: 8,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 8 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_payment_terms",
+                                question: "What payment terms would you be willing to accept from foreign buyers?",
+                                maxScore: 7,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Pay in advance", value: "advance", score: 7 },
+                                    { text: "Pay on delivery", value: "delivery", score: 6 },
+                                    { text: "Up to 30 days", value: "30", score: 5 },
+                                    { text: "31-60 days", value: "60", score: 4 },
+                                    { text: "61-120 days", value: "120", score: 3 },
+                                    { text: "Over 120 days", value: "120plus", score: 2 }
+                                ]
+                            },
+                            {
+                                id: "trade_capital_calculation",
+                                question: "Have you made calculations to know how much capital is needed to begin/continue exporting?",
+                                maxScore: 7,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Detailed calculations", value: "detailed", score: 7 },
+                                    { text: "Rough calculations", value: "rough", score: 3 },
+                                    { text: "No calculations", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_marketing_budget",
+                                question: "How much money can your firm spend on export marketing?",
+                                maxScore: 6,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "3% and above of revenues", value: "3plus", score: 6 },
+                                    { text: "1-2% of revenues", value: "1-2", score: 5 },
+                                    { text: "Up to 1% of revenues", value: "up1", score: 3 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_bank_financing",
+                                question: "Do you currently get bank financing for export from your local bank?",
+                                maxScore: 6,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 6 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_refinance_scheme",
+                                question: "Have you previously obtained finance through Export Refinance Scheme?",
+                                maxScore: 6,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 6 },
+                                    { text: "No / Do not have knowledge", value: "no", score: 0 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Regulatory & Other Compliances": {
+                        maxScore: 80,
+                        questions: [
+                            {
+                                id: "trade_legal_requirements",
+                                question: "Are you aware of the legal and regulatory requirements to export your product in the target market?",
+                                maxScore: 7,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Fully aware", value: "fully", score: 7 },
+                                    { text: "Partly aware", value: "partly", score: 5 },
+                                    { text: "Little aware", value: "little", score: 3 },
+                                    { text: "Not aware", value: "not", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_trade_agreements",
+                                question: "Are you aware of any bilateral or multilateral trade agreements related to your product or country of interest?",
+                                maxScore: 7,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "All of them", value: "all", score: 7 },
+                                    { text: "Some of them", value: "some", score: 4 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_govt_incentives",
+                                question: "Do you know of incentives offered by the government for exporting your product?",
+                                maxScore: 6,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "All of them", value: "all", score: 6 },
+                                    { text: "Some of them", value: "some", score: 3 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_iso_9001",
+                                question: "Do you have valid ISO 9001 certification?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 10 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_social_compliance",
+                                question: "How many valid social compliance certifications do you have? (SA 8000, WRAP, BSCI, Sedex)",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "2 or more", value: "2plus", score: 15 },
+                                    { text: "1", value: "1", score: 8 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_hse_compliance",
+                                question: "How many valid HSE compliance certifications do you have? (ISO 45001, ISO 14001, CE Mark, OSHA)",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "2 or more", value: "2plus", score: 15 },
+                                    { text: "1", value: "1", score: 8 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_sector_certifications",
+                                question: "How many valid sector-specific compliance certifications do you have? (HACCP, OEKO-TEX, ISO 22000, GMP, GOTS, SPS)",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "3 or more", value: "3plus", score: 20 },
+                                    { text: "2", value: "2", score: 15 },
+                                    { text: "1", value: "1", score: 10 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Export Processes": {
+                        maxScore: 40,
+                        questions: [
+                            {
+                                id: "trade_logistics_knowledge",
+                                question: "Do you have adequate knowledge about export-related logistics?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Complete knowledge", value: "complete", score: 5 },
+                                    { text: "Partial knowledge", value: "partial", score: 4 },
+                                    { text: "Very little knowledge", value: "little", score: 2 },
+                                    { text: "No knowledge", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_transport_plan",
+                                question: "Do you have a plan for how your products will be transported from the warehouse to the buyer's destination?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "A detailed plan is available", value: "detailed", score: 5 },
+                                    { text: "A rough plan is available", value: "rough", score: 2 },
+                                    { text: "No plan is available", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_logistics_costs",
+                                question: "Do you know how to calculate logistics costs (freight, insurance, port charges, inland transport) for exports?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 5 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_shipping_experience",
+                                question: "Do you have experience with international shipping, freight forwarding, and customs clearance?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Rich experience", value: "rich", score: 5 },
+                                    { text: "Little experience", value: "little", score: 3 },
+                                    { text: "No experience", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_documentation_knowledge",
+                                question: "Do you have knowledge about export-related documentation?",
+                                maxScore: 7,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Complete knowledge", value: "complete", score: 10 },
+                                    { text: "Partial knowledge", value: "partial", score: 7 },
+                                    { text: "Very little knowledge", value: "little", score: 3 },
+                                    { text: "No knowledge", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_weboc_psw",
+                                question: "Do you have knowledge about WeBOC and Pakistan Single Window (PSW) for filing documentation?",
+                                maxScore: 7,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Complete knowledge", value: "complete", score: 10 },
+                                    { text: "Partial knowledge", value: "partial", score: 7 },
+                                    { text: "Very little knowledge", value: "little", score: 3 },
+                                    { text: "No knowledge", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "trade_trained_staff",
+                                question: "Are there dedicated staff members in your firm who are trained in handling export documentation?",
+                                maxScore: 6,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 5 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        };
+
+        // Services questions data
+        const servicesQuestions = {
+            "Firm's Capacity": {
+                maxScore: 250,
+                subcategories: {
+                    "Business Structure": {
+                        maxScore: 80,
+                        questions: [
+                            {
+                                id: "service_edu_level",
+                                question: "What is your highest completed level of education?",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Bachelors & above", value: "bachelors", score: 15 },
+                                    { text: "Up to 12th grade", value: "12th", score: 8 },
+                                    { text: "Under matric", value: "under_matric", score: 5 }
+                                ],
+                                document: "Educational Certificates"
+                            },
+                            {
+                                id: "service_business_exp",
+                                question: "How many years of business experience do you have?",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than 15 years", value: "15plus", score: 15 },
+                                    { text: "10-15 years", value: "10-15", score: 12 },
+                                    { text: "5-10 years", value: "5-10", score: 8 },
+                                    { text: "Less than 5 years", value: "less5", score: 5 }
+                                ],
+                                document: "Certificate"
+                            },
+                            {
+                                id: "service_legal_form",
+                                question: "What is the legal form of your organization?",
+                                maxScore: 30,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Private Limited Company", value: "pvt_ltd", score: 30 },
+                                    { text: "Registered Partnership", value: "reg_partnership", score: 25 },
+                                    { text: "Unregistered Partnership", value: "unreg_partnership", score: 10 },
+                                    { text: "Sole Proprietorship", value: "sole", score: 5 }
+                                ],
+                                document: "Registration documents"
+                            },
+                            {
+                                id: "service_chamber_membership",
+                                question: "Do you have membership of Chamber of Commerce & Industry?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 10 },
+                                    { text: "No", value: "no", score: 0 }
+                                ],
+                                document: "Membership certificates"
+                            },
+                            {
+                                id: "service_sector_membership",
+                                question: "Do you have membership of sector association(s)?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 10 },
+                                    { text: "No", value: "no", score: 0 }
+                                ],
+                                document: "Membership certificates"
+                            }
+                        ]
+                    },
+                    "Technical Capacity/Innovation": {
+                        maxScore: 120,
+                        questions: [
+                            {
+                                id: "service_equipment_age",
+                                question: "How old is majority of your core equipment?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Up to 3 years old", value: "3", score: 20 },
+                                    { text: "3-5 years old", value: "3-5", score: 10 },
+                                    { text: "More than 5 years old", value: "5plus", score: 5 }
+                                ]
+                            },
+                            {
+                                id: "service_tech_status",
+                                question: "What is the status of your core technology with respect to your local competitors?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Most advanced", value: "most", score: 20 },
+                                    { text: "Advanced", value: "advanced", score: 15 },
+                                    { text: "Normal", value: "normal", score: 10 },
+                                    { text: "Basic", value: "basic", score: 5 }
+                                ]
+                            },
+                            {
+                                id: "service_equipment_investment",
+                                question: "How much have you invested on equipment during the last three years (as % of revenue)?",
+                                maxScore: 25,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than 10%", value: "10plus", score: 30 },
+                                    { text: "7-10%", value: "7-10", score: 20 },
+                                    { text: "3-6%", value: "3-6", score: 10 },
+                                    { text: "Less than 3%", value: "less3", score: 5 },
+                                    { text: "None", value: "none", score: 0 }
+                                ],
+                                document: "Audited financial statements"
+                            },
+                            {
+                                id: "service_software_systems",
+                                question: "Which of the following best describes the systems your business uses to manage operations?",
+                                maxScore: 40,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Fully integrated ERP system", value: "erp", score: 50 },
+                                    { text: "MIS with some analysis & decision making", value: "mis", score: 30 },
+                                    { text: "Basic record keeping systems", value: "basic", score: 10 },
+                                    { text: "Manual accounting system", value: "manual", score: 5 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Quality Assurance Infrastructure": {
+                        maxScore: 50,
+                        questions: [
+                            {
+                                id: "service_qa_dept",
+                                question: "Do you have a dedicated quality assurance/control department or staff?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 20 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_qa_tools",
+                                question: "Do you have quality assurance/control tools?",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 15 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_qa_docs",
+                                question: "Do you have documented quality control systems and procedures (manuals)?",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 15 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+            "Business Performance": {
+                maxScore: 250,
+                subcategories: {
+                    "Financial Performance": {
+                        maxScore: 100,
+                        questions: [
+                            {
+                                id: "service_revenue_avg",
+                                question: "Average Revenue (Sales) - Last 3 years",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "PKR 500-800 million", value: "500-800", score: 15 },
+                                    { text: "PKR 150-500 million", value: "150-500", score: 12 },
+                                    { text: "PKR 100-150 million", value: "100-150", score: 10 },
+                                    { text: "PKR 50-100 million", value: "50-100", score: 8 },
+                                    { text: "Up to PKR 50 million", value: "up50", score: 6 }
+                                ],
+                                document: "Audited financial statements"
+                            },
+                            {
+                                id: "service_revenue_growth",
+                                question: "Average Revenue Growth Rate (Last 3 years)",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than 25%", value: "25plus", score: 20 },
+                                    { text: "20-25%", value: "20-25", score: 16 },
+                                    { text: "15-20%", value: "15-20", score: 12 },
+                                    { text: "8-15%", value: "8-15", score: 8 },
+                                    { text: "Up to 8%", value: "up8", score: 4 },
+                                    { text: "0% or below", value: "0", score: 0 }
+                                ],
+                                document: "Audited financial statements"
+                            },
+                            {
+                                id: "service_net_income_margin",
+                                question: "Net Income Margin (Average)",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than 15%", value: "15plus", score: 20 },
+                                    { text: "12-15%", value: "12-15", score: 16 },
+                                    { text: "10-12%", value: "10-12", score: 12 },
+                                    { text: "5-10%", value: "5-10", score: 8 },
+                                    { text: "Up to 5%", value: "up5", score: 4 },
+                                    { text: "0% or negative", value: "0", score: 0 }
+                                ],
+                                document: "Audited financial statements"
+                            },
+                            {
+                                id: "service_debt_assets",
+                                question: "Debt to Assets Ratio",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "20-30%", value: "20-30", score: 15 },
+                                    { text: "10-20%", value: "10-20", score: 10 },
+                                    { text: "5-10%", value: "5-10", score: 6 },
+                                    { text: "More than 30% or less than 10%", value: "other", score: 2 }
+                                ]
+                            },
+                            {
+                                id: "service_asset_turnover",
+                                question: "Investment Productivity (Asset Turnover) - Sales/Assets Ratio",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "3.0 or higher", value: "3plus", score: 15 },
+                                    { text: "2.5-3.0", value: "2.5-3", score: 12 },
+                                    { text: "2.0", value: "2", score: 8 },
+                                    { text: "Less than 2.0", value: "less2", score: 4 }
+                                ],
+                                document: "Audited financial statements"
+                            },
+                            {
+                                id: "service_current_ratio",
+                                question: "Current Ratio (Current Assets / Current Liabilities)",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "1.0-2.0", value: "1-2", score: 15 },
+                                    { text: "More than 2.0", value: "2plus", score: 8 },
+                                    { text: "Less than 1.0", value: "less1", score: 6 }
+                                ],
+                                document: "Audited financial statements"
+                            }
+                        ]
+                    },
+                    "People and Capability": {
+                        maxScore: 70,
+                        questions: [
+                            {
+                                id: "service_avg_salary",
+                                question: "Average Salary/Worker compared to minimum wage",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Equal or more than minimum wage", value: "equal", score: 15 },
+                                    { text: "Up to 25% less than minimum wage", value: "25less", score: 10 },
+                                    { text: "25-50% less than minimum wage", value: "25-50", score: 7 },
+                                    { text: "More than 50% less than minimum wage", value: "50less", score: 0 }
+                                ],
+                                document: "Audited statements"
+                            },
+                            {
+                                id: "service_turnover_ratio",
+                                question: "Employee Turnover Ratio (Last year)",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Less than 20%", value: "less20", score: 15 },
+                                    { text: "20-25%", value: "20-25", score: 10 },
+                                    { text: "25-30%", value: "25-30", score: 5 },
+                                    { text: "More than 30%", value: "30plus", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_mgmt_education",
+                                question: "What percentage of your management positions are occupied by persons having at least a Bachelors degree?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "60% or more", value: "60plus", score: 10 },
+                                    { text: "40-60%", value: "40-60", score: 8 },
+                                    { text: "20-40%", value: "20-40", score: 6 },
+                                    { text: "Less than 20%", value: "less20", score: 2 }
+                                ]
+                            },
+                            {
+                                id: "service_operations_head",
+                                question: "Is your operations function headed by a person with formal technical education?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Masters degree", value: "masters", score: 10 },
+                                    { text: "Bachelors degree", value: "bachelors", score: 7 },
+                                    { text: "Diploma", value: "diploma", score: 3 }
+                                ]
+                            },
+                            {
+                                id: "service_employee_training",
+                                question: "Do you provide formal training to your employees?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 10 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_eobi_coverage",
+                                question: "What percentage of your employees are covered under EOBI or Social Security?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than 60%", value: "60plus", score: 5 },
+                                    { text: "40-60%", value: "40-60", score: 4 },
+                                    { text: "20-40%", value: "20-40", score: 3 },
+                                    { text: "10-20%", value: "10-20", score: 1 },
+                                    { text: "Less than 10%", value: "less10", score: 0 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Operations": {
+                        maxScore: 80,
+                        questions: [
+                            {
+                                id: "service_capacity_util",
+                                question: "What is your current capacity utilization?",
+                                maxScore: 35,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than 70%", value: "70plus", score: 20 },
+                                    { text: "60-70%", value: "60-70", score: 15 },
+                                    { text: "50-60%", value: "50-60", score: 10 },
+                                    { text: "40-50%", value: "40-50", score: 5 },
+                                    { text: "Less than 40%", value: "less40", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_market_research",
+                                question: "Do you conduct market research for your business operations?",
+                                maxScore: 25,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Always", value: "always", score: 20 },
+                                    { text: "Sometimes", value: "sometimes", score: 15 },
+                                    { text: "Rarely", value: "rarely", score: 5 },
+                                    { text: "Never", value: "never", score: 0 }
+                                ],
+                                document: "Audited financial statements"
+                            },
+                            {
+                                id: "service_providers",
+                                question: "How many distinct service providers does your firm have?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "8 or more", value: "8plus", score: 15 },
+                                    { text: "5-7", value: "5-7", score: 10 },
+                                    { text: "3-4", value: "3-4", score: 5 },
+                                    { text: "Up to 2", value: "up2", score: 2 }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+            "Export Performance": {
+                maxScore: 100,
+                subcategories: {
+                    "Export Performance": {
+                        maxScore: 100,
+                        questions: [
+                            {
+                                id: "service_total_exports",
+                                question: "Total exports (annual)",
+                                maxScore: 25,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "More than PKR 25 million", value: "25plus", score: 15 },
+                                    { text: "PKR 15-25 million", value: "15-25", score: 12 },
+                                    { text: "PKR 3-15 million", value: "3-15", score: 8 },
+                                    { text: "Up to PKR 3 million", value: "up3", score: 5 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_export_share",
+                                question: "Current Share of Exports as % of Total Revenue",
+                                maxScore: 25,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "60% or more", value: "60plus", score: 25 },
+                                    { text: "50-60%", value: "50-60", score: 15 },
+                                    { text: "40-50%", value: "40-50", score: 10 },
+                                    { text: "Up to 40%", value: "up40", score: 5 },
+                                    { text: "0%", value: "0", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_export_diversification",
+                                question: "How many types of services did you export last year?",
+                                maxScore: 25,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "5 or more", value: "5plus", score: 20 },
+                                    { text: "3-4", value: "3-4", score: 15 },
+                                    { text: "2", value: "2", score: 10 },
+                                    { text: "1", value: "1", score: 5 },
+                                    { text: "0", value: "0", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_export_markets",
+                                question: "How many export markets (countries) did you export to last year?",
+                                maxScore: 25,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "6 or more markets", value: "6plus", score: 25 },
+                                    { text: "4-5 markets", value: "4-5", score: 20 },
+                                    { text: "2-3 markets", value: "2-3", score: 15 },
+                                    { text: "1 market", value: "1", score: 10 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+            "Export Readiness": {
+                maxScore: 400,
+                subcategories: {
+                    "Internal Capacity": {
+                        maxScore: 40,
+                        questions: [
+                            {
+                                id: "service_export_fulfill",
+                                question: "Can your export orders be fulfilled using your internal capacity and systems?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes, completely", value: "yes", score: 10 },
+                                    { text: "Partly", value: "partly", score: 5 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_subcontractor_network",
+                                question: "Do you have a network of subcontractors through which you can fulfil your export order?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Very strong network", value: "vstrong", score: 10 },
+                                    { text: "Good network", value: "good", score: 10 },
+                                    { text: "Weak network", value: "weak", score: 5 },
+                                    { text: "No network", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_export_dept",
+                                question: "How would any new or additional export business be handled within your organization?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Establish/have separate export department", value: "separate", score: 15 },
+                                    { text: "Hire more staff in same departments", value: "hire", score: 12 },
+                                    { text: "Use existing manpower strength", value: "existing", score: 5 }
+                                ]
+                            },
+                            {
+                                id: "service_training_req",
+                                question: "Is any special training required to produce and supply your export order?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "No special training", value: "no", score: 10 },
+                                    { text: "Some training", value: "some", score: 5 },
+                                    { text: "Extensive training", value: "extensive", score: 0 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Service": {
+                        maxScore: 35,
+                        questions: [
+                            {
+                                id: "service_knowledge",
+                                question: "Are you aware of the types of services you want to export?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Fully aware", value: "fully", score: 20 },
+                                    { text: "Partly aware", value: "partly", score: 10 },
+                                    { text: "Little aware", value: "little", score: 5 },
+                                    { text: "Not aware", value: "not", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_competitive_advantage",
+                                question: "Does your service have a distinct competitive advantage (quality, price, uniqueness, innovation) over your competition in your target export market?",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Strong competitive advantage", value: "strong", score: 15 },
+                                    { text: "Average competitive advantage", value: "average", score: 8 },
+                                    { text: "No competitive advantage", value: "no", score: 0 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Export Planning": {
+                        maxScore: 125,
+                        questions: [
+                            {
+                                id: "service_export_plan",
+                                question: "Do you have a written export plan showing services, countries, pricing, etc.?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "A detailed plan is available", value: "detailed", score: 3 },
+                                    { text: "A rough plan is available", value: "rough", score: 2 },
+                                    { text: "Only an idea is there", value: "idea", score: 1 },
+                                    { text: "No plan is available", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_communication_plan",
+                                question: "Do you have a market communication plan to make your service known in export market?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 2 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_promo_material",
+                                question: "Does your firm have promotional material in English or other international language?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 5 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_export_cost_calc",
+                                question: "Have you calculated the cost of exporting, while considering all cost heads?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 3 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_profitability_assessment",
+                                question: "Have you done your assessment on how exporting will affect your overall profitability?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 2 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_test_marketing",
+                                question: "Have you started test marketing your service in the target market?",
+                                maxScore: 5,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 2 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_market_research_export",
+                                question: "Have you done market research for export business?",
+                                maxScore: 15,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Done some primary and secondary research", value: "both", score: 15 },
+                                    { text: "Done only secondary research", value: "secondary", score: 8 },
+                                    { text: "No market research", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_agent_dest",
+                                question: "Do you have an Agent or representative or office in the destination market?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 10 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_trade_fair_participation",
+                                question: "Have you participated in at least one international trade fair during the last two years?",
+                                maxScore: 12,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 12 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_trade_fair_deals",
+                                question: "Were you able to close deals at an international trade fair?",
+                                maxScore: 8,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 8 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_export_order_knowledge",
+                                question: "Do you know about ways to get export orders?",
+                                maxScore: 8,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Full knowledge", value: "full", score: 6 },
+                                    { text: "Partial knowledge", value: "partial", score: 4 },
+                                    { text: "Very little knowledge", value: "little", score: 2 },
+                                    { text: "No knowledge", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_unsolicited_inquiries",
+                                question: "Has your firm received any unsolicited inquiries from foreign firms?",
+                                maxScore: 6,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Many", value: "many", score: 5 },
+                                    { text: "Some", value: "some", score: 3 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_international_enquiries",
+                                question: "Have you made international enquiries to obtain export orders?",
+                                maxScore: 6,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 4 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_website_presence",
+                                question: "Does your business have an operational website or online presence to attract international customers?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 10 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_social_media",
+                                question: "Do you have an operational Facebook/Instagram page?",
+                                maxScore: 8,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 8 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_b2b_directories",
+                                question: "Do you have membership of at least one international buyer/supplier directories/platforms?",
+                                maxScore: 7,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 7 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Finance": {
+                        maxScore: 40,
+                        questions: [
+                            {
+                                id: "service_payment_mechanisms",
+                                question: "Are you aware of export payment mechanisms?",
+                                maxScore: 8,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 8 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_payment_terms",
+                                question: "What payment terms would you be willing to accept from foreign buyers?",
+                                maxScore: 7,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Pay in advance", value: "advance", score: 7 },
+                                    { text: "Pay on delivery", value: "delivery", score: 6 },
+                                    { text: "Up to 30 days", value: "30", score: 5 },
+                                    { text: "31-45 days", value: "45", score: 4 },
+                                    { text: "More than 45 days", value: "45plus", score: 1 }
+                                ]
+                            },
+                            {
+                                id: "service_capital_calculation",
+                                question: "Have you made calculations to know how much capital is needed to begin/continue exporting?",
+                                maxScore: 7,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Detailed calculations", value: "detailed", score: 5 },
+                                    { text: "Rough calculations", value: "rough", score: 2 },
+                                    { text: "No calculations", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_modification_finance",
+                                question: "Do you have resources to modify (if required) your service to suit overseas customers and standards?",
+                                maxScore: 6,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Financing available", value: "available", score: 5 },
+                                    { text: "Being arranged", value: "arranging", score: 2 },
+                                    { text: "No financing available", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_marketing_budget",
+                                question: "How much money can your firm spend on export marketing?",
+                                maxScore: 6,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "3% and above of revenues", value: "3plus", score: 5 },
+                                    { text: "1-2% of revenues", value: "1-2", score: 4 },
+                                    { text: "Up to 1% of revenues", value: "up1", score: 3 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_bank_financing",
+                                question: "Do you currently get bank financing for export from your local bank?",
+                                maxScore: 6,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 5 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Regulatory & Other Compliances": {
+                        maxScore: 80,
+                        questions: [
+                            {
+                                id: "service_legal_requirements",
+                                question: "Are you aware of the legal and regulatory requirements to export your services in the target market?",
+                                maxScore: 7,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Fully aware", value: "fully", score: 7 },
+                                    { text: "Partly aware", value: "partly", score: 5 },
+                                    { text: "Little aware", value: "little", score: 3 },
+                                    { text: "Not aware", value: "not", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_trade_agreements",
+                                question: "Are you aware of any bilateral or multilateral trade agreements related to your service or country of interest?",
+                                maxScore: 7,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "All of them", value: "all", score: 7 },
+                                    { text: "Some of them", value: "some", score: 4 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_govt_incentives",
+                                question: "Do you know of incentives offered by the government for exporting your services?",
+                                maxScore: 6,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "All of them", value: "all", score: 6 },
+                                    { text: "Some of them", value: "some", score: 3 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_iso_9001",
+                                question: "Do you have valid ISO 9001 certification?",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 6 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_social_compliance",
+                                question: "How many valid social compliance certifications do you have? (SA 8000, WRAP, BSCI, Sedex)",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "2 or more", value: "2plus", score: 12 },
+                                    { text: "1", value: "1", score: 8 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_hse_compliance",
+                                question: "How many valid HSE compliance certifications do you have? (ISO 45001, ISO 14001, CE Mark, OSHA)",
+                                maxScore: 10,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "2 or more", value: "2plus", score: 12 },
+                                    { text: "1", value: "1", score: 8 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_sector_certifications",
+                                question: "How many valid sector-specific compliance certifications do you have? (HACCP, OEKO-TEX, ISO 22000, GMP, GOTS, SPS)",
+                                maxScore: 30,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "3 or more", value: "3plus", score: 30 },
+                                    { text: "2", value: "2", score: 20 },
+                                    { text: "1", value: "1", score: 10 },
+                                    { text: "None", value: "none", score: 0 }
+                                ]
+                            }
+                        ]
+                    },
+                    "Export Processes": {
+                        maxScore: 40,
+                        questions: [
+                            {
+                                id: "service_documentation_knowledge",
+                                question: "Do you have knowledge about export-related documentation?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Complete knowledge", value: "complete", score: 10 },
+                                    { text: "Partial knowledge", value: "partial", score: 7 },
+                                    { text: "Very little knowledge", value: "little", score: 3 },
+                                    { text: "No knowledge", value: "no", score: 0 }
+                                ]
+                            },
+                            {
+                                id: "service_trained_staff",
+                                question: "Are there dedicated staff members in your firm who are trained in handling export documentation?",
+                                maxScore: 20,
+                                type: "select",
+                                options: [
+                                    { text: "Select an option", value: "", score: 0 },
+                                    { text: "Yes", value: "yes", score: 5 },
+                                    { text: "No", value: "no", score: 0 }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        };
+
         let currentCompanyType = '';
         let currentQuestions = {};
         let currentCategoryIndex = 0;
@@ -1606,8 +3617,18 @@
                 document.getElementById('companyTypeSection').style.display = 'none';
                 generateQuestions();
                 showCategory(0);
-            } else {
-                alert('Coming soon! Currently only Manufacturing evaluation is available.');
+            } else if (type === 'trading') {
+                currentCompanyType = type;
+                currentQuestions = tradingQuestions;
+                document.getElementById('companyTypeSection').style.display = 'none';
+                generateQuestions();
+                showCategory(0);
+            } else if (type === 'services') {
+                currentCompanyType = type;
+                currentQuestions = servicesQuestions;
+                document.getElementById('companyTypeSection').style.display = 'none';
+                generateQuestions();
+                showCategory(0);
             }
         }
 
