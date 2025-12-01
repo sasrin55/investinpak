@@ -15,52 +15,12 @@ CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:cs
 CURRENCY_CODE = "PKR"
 CURRENCY_FORMAT = "$,.0f"
 
-# --- CUSTOM THEME COLORS ---
-PAR_PRIMARY = "#006B3F"      # Dark Teal/Green (Buttons, Sliders, Highlights)
-PAR_BACKGROUND = "#F0F5F2"   # Light Gray/Green background
-PAR_TEXT = "#101010" # Dark text color
-
-# Configure the page layout and theme
+# Configure the page layout (SIMPLE, standard arguments to avoid errors)
 st.set_page_config(
     page_title="Zaraimandi Sales Dashboard",
     layout="wide",
     initial_sidebar_state="collapsed",
-    
-    primaryColor=PAR_PRIMARY,
-    backgroundColor=PAR_BACKGROUND,
-    secondaryBackgroundColor="#FFFFFF", 
-    textColor=PAR_TEXT,
-    font="sans serif"
 )
-
-# --- CSS Injection for Robust Theming ---
-st.markdown(f"""
-<style>
-    /* Set Primary Color for buttons, selections, etc. */
-    .stButton>button, .stSlider .st-bd, .stMultiSelect [data-baseweb="tag"] > span {{
-        background-color: {PAR_PRIMARY};
-        color: white;
-    }}
-    .stSelectbox div[data-baseweb="select"] {{
-        border-color: {PAR_PRIMARY};
-    }}
-    /* Set overall background color */
-    [data-testid="stAppViewContainer"] {{
-        background-color: {PAR_BACKGROUND};
-    }}
-    /* Ensure Streamlit containers (like metric boxes) are white for contrast */
-    [data-testid="stVerticalBlock"] {{
-        background-color: #FFFFFF;
-        padding: 1rem;
-        border-radius: 0.5rem;
-    }}
-    /* Style headers */
-    h1, h2, h3, h4 {{
-        color: {PAR_PRIMARY};
-    }}
-</style>
-""", unsafe_allow_html=True)
-# ----------------------------------------
 
 # --- Title and Header ---
 st.title("Zaraimandi Sales Dashboard")
@@ -166,7 +126,7 @@ last_7_days_start = today - timedelta(days=6)
 st.subheader("Reporting Filters")
 filter_cols = st.columns([1, 4])
 
-# 1. Date range selector
+# 1. Date range selector (Only filter remaining)
 with filter_cols[0]:
     date_range = st.date_input(
         "Reporting Period",
@@ -201,7 +161,7 @@ def metric_format(value):
     return f"{CURRENCY_CODE} {value:,.0f}"
 
 ## KPI Section 1: Top Transaction Count Summary Table
-st.subheader("Transaction Count Summary")
+st.subheader("Transaction Count Summary (Today, Week, Month)")
 
 txn_data = {
     "Period": ["Transactions Today", "Transactions This Week", "Transactions This Month"],
