@@ -6,7 +6,6 @@ import numpy as np
 
 # ==============================================================================
 # 1. CONFIGURATION AND INITIAL SETUP
-# (Applying the new name and custom color theme)
 # ==============================================================================
 
 # --- SETTINGS ---
@@ -14,36 +13,38 @@ SHEET_ID = "1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q"
 TAB_NAME = "Master"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={TAB_NAME}"
 CURRENCY_CODE = "PKR"
-CURRENCY_FORMAT = "$,.0f" # Format for amount columns
+CURRENCY_FORMAT = "$,.0f"
 
-# --- CUSTOM THEME COLORS based on the PAR website (Dark Teal/Green scheme) ---
+# --- CUSTOM THEME COLORS (Dark Teal/Green scheme) ---
 PAR_PRIMARY = "#006B3F" # Dark Teal/Green for buttons, links, sliders
 PAR_BACKGROUND = "#F0F5F2" # Light Gray/Green background
 PAR_TEXT = "#101010" # Dark text color
 
 # Configure the page layout and theme
+# ----------------------------------------------------------------------
+# FIX APPLIED HERE: Theme parameters passed directly to st.set_page_config
+# ----------------------------------------------------------------------
 st.set_page_config(
-    page_title="Zaraimandi Sales Dashboard", # Updated Title
+    page_title="Zaraimandi Sales Dashboard",
     layout="wide",
-    initial_sidebar_state="collapsed", # Ensure sidebar is hidden
+    initial_sidebar_state="collapsed",
     
-    theme={
-        "primaryColor": PAR_PRIMARY,
-        "backgroundColor": PAR_BACKGROUND,
-        "secondaryBackgroundColor": "#FFFFFF", # White background for charts/tables
-        "textColor": PAR_TEXT,
-        "font": "sans serif"
-    }
+    # Theme parameters passed directly (this resolves the TypeError)
+    primaryColor=PAR_PRIMARY,
+    backgroundColor=PAR_BACKGROUND,
+    secondaryBackgroundColor="#FFFFFF", 
+    textColor=PAR_TEXT,
+    font="sans serif"
 )
 
 # --- Title and Header ---
-st.title("Zaraimandi Sales Dashboard") # Updated Dashboard Title
+st.title("Zaraimandi Sales Dashboard")
 st.markdown("A unified view of transaction and commodity-level sales metrics.")
 st.markdown("---")
 
 
 # ==============================================================================
-# 2. DATA LOADING AND CLEANUP
+# 2. DATA LOADING AND CLEANUP (No functional changes)
 # ==============================================================================
 
 @st.cache_data(show_spinner="Connecting to Data Source and Loading...")
@@ -116,7 +117,7 @@ def count_transactions(df, start, end):
 
 
 # ==============================================================================
-# 3. DATA LOADING, FILTERING, AND PRE-CALCULATIONS
+# 3. DATA LOADING, FILTERING, AND PRE-CALCULATIONS (No functional changes)
 # ==============================================================================
 
 raw_df = load_data()
@@ -233,7 +234,6 @@ daily_summary = (
     .sort_values("date")
 )
 
-# Altair Line Chart for professional look
 chart_trend = alt.Chart(daily_summary).mark_line(point=True).encode(
     x=alt.X("date:T", title="Date", axis=alt.Axis(format="%b %d, %Y")),
     y=alt.Y("Total_Sales:Q", title=f"Total Sales ({CURRENCY_CODE})", axis=alt.Axis(format=CURRENCY_FORMAT)),
@@ -281,7 +281,6 @@ with col_chart:
 
     top_commodity_summary = commodity_summary.head(top_n)
 
-    # Altair Bar Chart
     chart_bar = alt.Chart(top_commodity_summary).mark_bar().encode(
         x=alt.X("Amount:Q", title=f"Total Sales ({CURRENCY_CODE})", axis=alt.Axis(format=CURRENCY_FORMAT)),
         y=alt.Y("commodity:N", sort="-x", title="Commodity"),
@@ -309,7 +308,7 @@ with col_table:
 st.markdown("---")
 
 # ==============================================================================
-# 7. DATA EXPLORER
+# 7. DATA EXPLORER (No functional changes)
 # ==============================================================================
 
 st.header("Data Explorer: Transaction and Commodity Detail")
