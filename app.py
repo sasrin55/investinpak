@@ -3,7 +3,7 @@ import streamlit as st
 from datetime import date, timedelta
 import altair as alt
 import numpy as np
-import re # Import regex for advanced cleaning
+import re
 
 # ==============================================================================
 # 1. CONFIGURATION AND INITIAL SETUP
@@ -14,7 +14,7 @@ SHEET_ID = "1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q"
 TAB_NAME = "Master"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={TAB_NAME}"
 CURRENCY_CODE = "PKR"
-CURRENCY_FORMAT = "$,.0f"
+CURRENCY_FORMAT = ",.0f" 
 
 # Configure the page layout (Standard, stable arguments)
 st.set_page_config(
@@ -30,7 +30,7 @@ st.markdown("---")
 
 
 # ==============================================================================
-# 2. DATA LOADING AND CLEANUP
+# 2. DATA LOADING AND CLEANUP (Functions remain the same)
 # ==============================================================================
 
 @st.cache_data(show_spinner="Connecting to Data Source and Loading...")
@@ -96,21 +96,14 @@ def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
         
         # Consolidation mapping for common misspellings/variants
         mapping = {
-            'cotton': 'Cotton',
-            'coton': 'Cotton',
-            'paddy': 'Paddy',
-            'padd': 'Paddy',
-            'wheat': 'Wheat',
-            'wheat and paddy': 'Wheat & Paddy',
-            'edible oil': 'Edible Oil',
-            'edibleoil': 'Edible Oil',
-            'fertilizers': 'Fertilizer',
-            'fertilizer': 'Fertilizer',
-            'pulses': 'Pulses',
-            'daal': 'Pulses',
+            'cotton': 'Cotton', 'coton': 'Cotton',
+            'paddy': 'Paddy', 'padd': 'Paddy',
+            'wheat': 'Wheat', 'wheat and paddy': 'Wheat & Paddy',
+            'edible oil': 'Edible Oil', 'edibleoil': 'Edible Oil',
+            'fertilizers': 'Fertilizer', 'fertilizer': 'Fertilizer',
+            'pulses': 'Pulses', 'daal': 'Pulses',
             'bajra': 'Bajra',
-            'lm': 'Livestock', # Assuming 'Lm' is short for Livestock marketing
-            'livestock': 'Livestock'
+            'lm': 'Livestock', 'livestock': 'Livestock'
         }
         
         # Apply mapping or title case if no map found
@@ -149,6 +142,7 @@ def count_transactions(df, start, end):
     mask = (df["date"] >= start) & (df["date"] <= end)
     return df.loc[mask].shape[0]
 
+
 # ==============================================================================
 # 3. DATA LOADING, FILTERING, AND PRE-CALCULATIONS
 # ==============================================================================
@@ -167,8 +161,6 @@ max_data_date = raw_df["date"].max()
 start_of_year = date(today.year, 1, 1)
 last_30_days_start = today - timedelta(days=29) # 30 days including today
 
-def metric_format(value):
-    return f"{CURRENCY_CODE} {value:,.0f}"
 
 ## 📊 Top-Level Filters
 st.subheader("Reporting Filters")
@@ -198,72 +190,168 @@ if raw_df_filtered.empty or exploded_df_filtered.empty:
 
 st.markdown("---")
 
+
 # ==============================================================================
 # 4. KEY PERFORMANCE INDICATORS (KPIs) - STRUCTURED TABLES
 # ==============================================================================
 
 st.header("Key Performance Indicators (KPIs)")
 
-## KPI Section 1: YTD Amount (On Top)
-st.subheader("Year-To-Date Cumulative Sales")
-ytd_amount = sum_between(raw_df, start_of_year, today)
-
-kpi_col_ytd, _, _, _ = st.columns(4)
-with kpi_col_ytd:
-    st.metric("**YTD Total Sales**", metric_format(ytd_amount))
-
-st.markdown("---")
+def metric_format(value):
+    return f"{CURRENCY_CODE} {value:,.0f}"
 
 
-## KPI Section 2: Detailed Transaction Summaries
+## KPI Section 1: Detailed Transaction Summaries
 
 def create_summary_table(df, period_start, period_end, title):
-    """Generates a detailed table for a specific period."""
+    """Generates a detailed table showing Customer, Commodity, and Amount for a period."""
     
     # Filter the exploded data for the specific period
     period_mask = (df["date"] >= period_start) & (df["date"] <= period_end)
     summary_df = exploded_df.loc[period_mask].copy()
     
-    # Group by customer and commodity to summarize the transaction
+    # Group by customer and commodity to summarize the transaction amount
     summary_df = summary_df.groupby(["customer_name", "commodity"])["amount_per_commodity"].sum().reset_index()
     
     summary_df = summary_df.rename(columns={
         "customer_name": "Customer",
         "commodity": "Commodity",
-        "amount_per_commodity": "Amount"
+        "amount_per_commodity": f"Amount ({CURRENCY_CODE})"
     })
     
     # Sort and format the output
-    summary_df = summary_df.sort_values("Amount", ascending=False)
+    summary_df = summary_df.sort_values(f"Amount ({CURRENCY_CODE})", ascending=False)
     
     # Apply styling for better presentation
     styled_df = summary_df.style.format({
-        "Amount": f"{CURRENCY_CODE} {{:,.0f}}",
+        f"Amount ({CURRENCY_CODE})": f"{CURRENCY_CODE} {{:,.0f}}",
     })
 
-    st.subheader(f"{title} (Transactions: {count_transactions(raw_df, period_start, period_end)})")
-    st.dataframe(styled_df, use_container_width=True, hide_index=True)
+    st.subheader(f"{title} (Total Transactions: {count_transactions(raw_df, period_start, period_end)})")
+    
+    # Use st.container to ensure the table sits nicely in the column
+    with st.container(border=True):
+        st.dataframe(styled_df, use_container_width=True, hide_index=True)
 
 
-col_today, col_30days, col_year = st.columns(3)
+col_today, col_30days, col_ytd_tables = st.columns(3)
 
+# 1. SALES TODAY
 with col_today:
     create_summary_table(exploded_df, today, today, "Today's Sales Breakdown")
     
+# 2. LAST 30 DAYS
 with col_30days:
     create_summary_table(exploded_df, last_30_days_start, today, "Last 30 Days Sales Breakdown")
 
-with col_year:
-    # Use YTD for the third column, as Today and 30 days are already covered
+# 3. YTD SUMMARY & TABLE (YTD Amount Metric placed above its corresponding table)
+with col_ytd_tables:
+    # YTD Amount Metric
+    st.subheader("Year-To-Date Total Sales")
+    ytd_amount = sum_between(raw_df, start_of_year, today)
+    st.metric("**Total YTD Sales**", metric_format(ytd_amount))
+    st.markdown("---")
+    
+    # YTD Sales Breakdown Table
     create_summary_table(exploded_df, start_of_year, today, "YTD Sales Breakdown")
     
 
 st.markdown("---")
+
 # ==============================================================================
-# 5. VISUALIZATION: COMMODITY BREAKDOWN (Original chart kept, trend removed)
+# 5. REPEAT CUSTOMERS BY COMMODITY (Functions remain the same)
 # ==============================================================================
 
-st.header("Commodity Performance & Mix")
+st.header("Customer Loyalty Analysis")
+
+repeat_customer_analysis = (
+    exploded_df.groupby(["customer_name", "commodity"])["date"].nunique().reset_index()
+)
+repeat_customer_analysis.rename(columns={"date": "Total Transactions"}, inplace=True)
+
+# Filter for customers with more than one transaction for the same commodity
+repeat_customer_analysis = repeat_customer_analysis[repeat_customer_analysis["Total Transactions"] > 1]
+
+if not repeat_customer_analysis.empty:
+    
+    # Summarize the total amount spent by these repeat customers on that commodity
+    amount_spent = exploded_df.groupby(["customer_name", "commodity"])["amount_per_commodity"].sum().reset_index()
+    
+    # Merge transaction count with total amount
+    repeat_customer_analysis = pd.merge(
+        repeat_customer_analysis, 
+        amount_spent, 
+        on=["customer_name", "commodity"]
+    )
+    repeat_customer_analysis.rename(columns={"amount_per_commodity": f"Total Amount ({CURRENCY_CODE})"}, inplace=True)
+    
+    repeat_customer_analysis = repeat_customer_analysis.sort_values(
+        f"Total Amount ({CURRENCY_CODE})", ascending=False
+    )
+    
+    st.subheader("Repeat Buyers (Multiple Transactions for Same Commodity)")
+    st.markdown("Identifies customers with strong loyalty to a specific commodity.")
+
+    styled_df = repeat_customer_analysis.style.format({
+        f"Total Amount ({CURRENCY_CODE})": f"{CURRENCY_CODE} {{:,.0f}}"
+    })
+    
+    st.dataframe(styled_df, use_container_width=True, hide_index=True)
+else:
+    st.info("No repeat customers found for the same commodity across the entire dataset.")
+
+st.markdown("---")
+
+
+# ==============================================================================
+# 6. COMMODITY SEASONALITY (Functions remain the same)
+# ==============================================================================
+
+st.header("Commodity Seasonality Analysis")
+st.markdown("Sales trend by month to identify peak selling seasons for each commodity.")
+
+# Prepare data for Altair chart
+seasonality_df = exploded_df.copy()
+seasonality_df["Month"] = seasonality_df["date"].apply(lambda x: x.replace(day=1)) # Normalize date to month start
+seasonality_df["Month_Name"] = seasonality_df["date"].apply(lambda x: x.strftime("%Y-%m"))
+
+seasonality_summary = seasonality_df.groupby(["Month_Name", "commodity"])["amount_per_commodity"].sum().reset_index()
+seasonality_summary.rename(columns={"amount_per_commodity": "Total Sales"}, inplace=True)
+
+# Select box to pick the commodity for visualization
+commodity_list = sorted(seasonality_summary["commodity"].unique().tolist())
+selected_season_commodity = st.selectbox(
+    "Select Commodity for Seasonality Chart",
+    options=commodity_list,
+    index=0 # Default to the first commodity
+)
+
+seasonality_chart_data = seasonality_summary[seasonality_summary["commodity"] == selected_season_commodity]
+
+if not seasonality_chart_data.empty:
+    # Altair chart definition
+    season_chart = alt.Chart(seasonality_chart_data).mark_line(point=True).encode(
+        x=alt.X("Month_Name:T", title="Month", axis=alt.Axis(format="%Y-%m")),
+        y=alt.Y("Total Sales:Q", title=f"Total Sales ({CURRENCY_CODE})", axis=alt.Axis(format=CURRENCY_FORMAT)),
+        tooltip=[
+            alt.Tooltip("Month_Name:T", title="Month", format="%Y-%m"),
+            alt.Tooltip("Total Sales:Q", title="Sales Amount", format=CURRENCY_FORMAT)
+        ]
+    ).properties(
+        title=f"Monthly Sales Trend for {selected_season_commodity}"
+    ).interactive()
+
+    st.altair_chart(season_chart, use_container_width=True)
+else:
+    st.info(f"No seasonality data found for {selected_season_commodity} in the dataset.")
+
+st.markdown("---")
+
+# ==============================================================================
+# 7. COMMODITY BREAKDOWN (Bar Chart) (Functions remain the same)
+# ==============================================================================
+
+st.header("Commodity Performance & Mix (All Data)")
 
 commodity_summary = (
     exploded_df_filtered.groupby("commodity")["amount_per_commodity"]
@@ -301,7 +389,8 @@ with col_chart:
         ]
     ).properties(
         title=f"Top {top_n} Commodities by Sales Amount"
-    )
+    ).interactive() # Allow zoom/pan
+
     st.altair_chart(chart_bar, use_container_width=True)
 
 with col_table:
@@ -319,7 +408,7 @@ with col_table:
 st.markdown("---")
 
 # ==============================================================================
-# 6. DATA EXPLORER
+# 8. DATA EXPLORER (Functions remain the same)
 # ==============================================================================
 
 st.header("Data Explorer: Transaction and Commodity Detail")
@@ -341,7 +430,6 @@ if data_choice == "Raw Transactions (Total Amount)":
 
 else:
     st.subheader("Exploded Commodity Data")
-    # Use the filtered data for display, but show the cleaned commodity name
     df_display = exploded_df_filtered.sort_values(["date", "customer_name"], ascending=False).drop(columns=['amount_pkr'], errors='ignore')
 
     styled_df = df_display.style.format({
