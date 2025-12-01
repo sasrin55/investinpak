@@ -30,7 +30,7 @@ st.markdown("---")
 
 
 # ==============================================================================
-# 2. DATA LOADING AND CLEANUP (Functions remain the same)
+# 2. DATA LOADING AND CLEANUP
 # ==============================================================================
 
 @st.cache_data(show_spinner="Connecting to Data Source and Loading...")
@@ -66,7 +66,7 @@ def load_data():
 def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
     """
     Splits transaction rows into one row per commodity, fairly allocating the total amount,
-    with enhanced cleaning for de-duplication.
+    with ENHANCED cleaning for de-duplication (stripping punctuation/extra spaces).
     """
     if base_df.empty or "commodities" not in base_df.columns:
         return base_df.copy()
@@ -88,27 +88,43 @@ def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
     
     # --- AGGRESSIVE COMMODITY CLEANING/NORMALIZATION ---
     def normalize_commodity_name(name):
-        name = name.lower().strip()
         if not name:
             return None
-        # Remove common extraneous words
-        name = re.sub(r' (data|group|s|\.)$', '', name).strip()
+        
+        # 1. Convert to lowercase and strip leading/trailing spaces
+        name = name.lower().strip()
+        
+        # 2. Remove all non-alphanumeric characters except spaces (removes periods, commas, etc.)
+        name = re.sub(r'[^\w\s]', '', name)
+        
+        # 3. Collapse multiple spaces to single space, then strip again
+        name = re.sub(r'\s+', ' ', name).strip()
+        
+        if not name:
+            return None
         
         # Consolidation mapping for common misspellings/variants
         mapping = {
-            'cotton': 'Cotton', 'coton': 'Cotton',
+            'cotton': 'Cotton', 'coton': 'Cotton', 'cottonmillet': 'Cotton Millet',
             'paddy': 'Paddy', 'padd': 'Paddy',
-            'wheat': 'Wheat', 'wheat and paddy': 'Wheat & Paddy',
-            'edible oil': 'Edible Oil', 'edibleoil': 'Edible Oil',
-            'fertilizers': 'Fertilizer', 'fertilizer': 'Fertilizer',
+            'wheat': 'Wheat', 'wheatandpaddy': 'Wheat & Paddy',
+            'edibleoil': 'Edible Oil',
+            'fertilizer': 'Fertilizer', 
             'pulses': 'Pulses', 'daal': 'Pulses',
             'bajra': 'Bajra',
-            'lm': 'Livestock', 'livestock': 'Livestock'
+            'livestock': 'Livestock', 'lm': 'Livestock', 
+            'sesame': 'Sesame', 'sesamedata': 'Sesame',
+            'sugar': 'Sugar', 'sugarwheat': 'Sugar + Wheat',
+            'vegetables': 'Vegetables', 'vegetable': 'Vegetables',
+            'mustard': 'Mustard', 'mustrad': 'Mustard',
+            'kiryana': 'Kiryana',
+            'dryfruits': 'Dry Fruits',
+            'spices': 'Spices', 'spicesdata': 'Spices'
         }
         
         # Apply mapping or title case if no map found
         for key, value in mapping.items():
-            if key in name:
+            if name == key:
                 return value
         
         return name.title()
@@ -200,12 +216,13 @@ st.header("Key Performance Indicators (KPIs)")
 def metric_format(value):
     return f"{CURRENCY_CODE} {value:,.0f}"
 
-
 ## KPI Section 1: Detailed Transaction Summaries
 
 def create_summary_table(df, period_start, period_end, title):
     """Generates a detailed table showing Customer, Commodity, and Amount for a period."""
     
+    AMOUNT_COL_NAME = f"Amount ({CURRENCY_CODE})"
+
     # Filter the exploded data for the specific period
     period_mask = (df["date"] >= period_start) & (df["date"] <= period_end)
     summary_df = exploded_df.loc[period_mask].copy()
@@ -216,15 +233,16 @@ def create_summary_table(df, period_start, period_end, title):
     summary_df = summary_df.rename(columns={
         "customer_name": "Customer",
         "commodity": "Commodity",
-        "amount_per_commodity": f"Amount ({CURRENCY_CODE})"
+        "amount_per_commodity": AMOUNT_COL_NAME # Use the calculated name
     })
     
     # Sort and format the output
-    summary_df = summary_df.sort_values(f"Amount ({CURRENCY_CODE})", ascending=False)
+    summary_df = summary_df.sort_values(AMOUNT_COL_NAME, ascending=False)
     
     # Apply styling for better presentation
+    # Note: Ensure the column name used for styling is exactly the same as the one renamed above
     styled_df = summary_df.style.format({
-        f"Amount ({CURRENCY_CODE})": f"{CURRENCY_CODE} {{:,.0f}}",
+        AMOUNT_COL_NAME: f"{CURRENCY_CODE} {{:,.0f}}",
     })
 
     st.subheader(f"{title} (Total Transactions: {count_transactions(raw_df, period_start, period_end)})")
