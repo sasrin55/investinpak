@@ -66,7 +66,7 @@ def load_data():
 def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
     """
     Splits transaction rows into one row per commodity, fairly allocating the total amount,
-    with ENHANCED cleaning for de-duplication (stripping punctuation/extra spaces).
+    with ENHANCED cleaning for de-duplication and non-commodity removal.
     """
     if base_df.empty or "commodities" not in base_df.columns:
         return base_df.copy()
@@ -91,18 +91,24 @@ def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
         if not name:
             return None
         
-        # 1. Convert to lowercase and strip leading/trailing spaces
+        # 1. Convert to lowercase and strip punctuation/extra spaces
         name = name.lower().strip()
-        
-        # 2. Remove all non-alphanumeric characters except spaces (removes periods, commas, etc.)
         name = re.sub(r'[^\w\s]', '', name)
-        
-        # 3. Collapse multiple spaces to single space, then strip again
         name = re.sub(r'\s+', ' ', name).strip()
         
         if not name:
             return None
+            
+        # Hardcoded list of items to REMOVE (non-commodities or internal tracking)
+        NON_COMMODITY_KEYWORDS = [
+            'unknown', 'not confirm yet', 'discussion', 'contact sale', 
+            'live market', 'data', 'group', 'g', 'um', 'l m', 'lm', # common internal/tracking codes
+            'fruits', 'fruit', 'vegetables', 'vegetable' # Use singular/plural variants for safety if not in mapping
+        ]
         
+        if any(keyword in name for keyword in NON_COMMODITY_KEYWORDS):
+            return None
+
         # Consolidation mapping for common misspellings/variants
         mapping = {
             'cotton': 'Cotton', 'coton': 'Cotton', 'cottonmillet': 'Cotton Millet',
@@ -112,14 +118,16 @@ def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
             'fertilizer': 'Fertilizer', 
             'pulses': 'Pulses', 'daal': 'Pulses',
             'bajra': 'Bajra',
-            'livestock': 'Livestock', 'lm': 'Livestock', 
-            'sesame': 'Sesame', 'sesamedata': 'Sesame',
+            'livestock': 'Livestock', 
+            'sesame': 'Sesame', 
             'sugar': 'Sugar', 'sugarwheat': 'Sugar + Wheat',
-            'vegetables': 'Vegetables', 'vegetable': 'Vegetables',
             'mustard': 'Mustard', 'mustrad': 'Mustard',
             'kiryana': 'Kiryana',
             'dryfruits': 'Dry Fruits',
-            'spices': 'Spices', 'spicesdata': 'Spices'
+            'spices': 'Spices',
+            'rice': 'Rice',
+            'maize': 'Maize',
+            'dates': 'Dates'
         }
         
         # Apply mapping or title case if no map found
@@ -127,6 +135,7 @@ def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
             if name == key:
                 return value
         
+        # If still not found and not excluded, return Title Case version
         return name.title()
 
     temp["commodity_list"] = temp["commodity_list"].apply(
@@ -160,7 +169,7 @@ def count_transactions(df, start, end):
 
 
 # ==============================================================================
-# 3. DATA LOADING, FILTERING, AND PRE-CALCULATIONS
+# 3. DATA LOADING, FILTERING, AND PRE-CALCULATIONS (Functions remain the same)
 # ==============================================================================
 
 raw_df = load_data()
@@ -240,7 +249,6 @@ def create_summary_table(df, period_start, period_end, title):
     summary_df = summary_df.sort_values(AMOUNT_COL_NAME, ascending=False)
     
     # Apply styling for better presentation
-    # Note: Ensure the column name used for styling is exactly the same as the one renamed above
     styled_df = summary_df.style.format({
         AMOUNT_COL_NAME: f"{CURRENCY_CODE} {{:,.0f}}",
     })
@@ -256,13 +264,25 @@ col_today, col_30days, col_ytd_tables = st.columns(3)
 
 # 1. SALES TODAY
 with col_today:
+    # --- ADDED: Today Amount Metric ---
+    st.subheader("Today's Total Sales")
+    today_amount = sum_between(raw_df, today, today)
+    st.metric("**Total Today's Sales**", metric_format(today_amount))
+    st.markdown("---")
+    
     create_summary_table(exploded_df, today, today, "Today's Sales Breakdown")
     
 # 2. LAST 30 DAYS
 with col_30days:
+    # --- ADDED: Last 30 Days Amount Metric ---
+    st.subheader("Last 30 Days Total Sales")
+    last_30_amount = sum_between(raw_df, last_30_days_start, today)
+    st.metric("**Total Last 30 Days Sales**", metric_format(last_30_amount))
+    st.markdown("---")
+    
     create_summary_table(exploded_df, last_30_days_start, today, "Last 30 Days Sales Breakdown")
 
-# 3. YTD SUMMARY & TABLE (YTD Amount Metric placed above its corresponding table)
+# 3. YTD SUMMARY & TABLE 
 with col_ytd_tables:
     # YTD Amount Metric
     st.subheader("Year-To-Date Total Sales")
