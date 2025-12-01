@@ -3,6 +3,7 @@ import streamlit as st
 from datetime import date, timedelta
 import altair as alt
 import numpy as np
+import re # Import regex for advanced cleaning
 
 # ==============================================================================
 # 1. CONFIGURATION AND INITIAL SETUP
@@ -15,7 +16,7 @@ CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:cs
 CURRENCY_CODE = "PKR"
 CURRENCY_FORMAT = "$,.0f"
 
-# Configure the page layout (SIMPLE, standard arguments to avoid errors)
+# Configure the page layout (Standard, stable arguments)
 st.set_page_config(
     page_title="Zaraimandi Sales Dashboard",
     layout="wide",
@@ -24,12 +25,12 @@ st.set_page_config(
 
 # --- Title and Header ---
 st.title("Zaraimandi Sales Dashboard")
-st.markdown("A unified view of transaction and commodity-level sales metrics.")
+st.markdown("Transaction and Commodity-level Sales Intelligence.")
 st.markdown("---")
 
 
 # ==============================================================================
-# 2. DATA LOADING AND CLEANUP (Functions remain the same)
+# 2. DATA LOADING AND CLEANUP
 # ==============================================================================
 
 @st.cache_data(show_spinner="Connecting to Data Source and Loading...")
@@ -63,29 +64,77 @@ def load_data():
 
 
 def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
-    """Splits transaction rows into one row per commodity, fairly allocating the total amount."""
+    """
+    Splits transaction rows into one row per commodity, fairly allocating the total amount,
+    with enhanced cleaning for de-duplication.
+    """
     if base_df.empty or "commodities" not in base_df.columns:
         return base_df.copy()
 
     temp = base_df.copy()
     temp["commodities"] = temp["commodities"].fillna("").astype(str)
+
+    # Normalize separators to commas
     temp["commodities_clean"] = (
         temp["commodities"]
         .str.replace(r"[\s]*[&\/]| and ", ",", regex=True)
         .str.strip()
     )
 
+    # Build list of commodities
     temp["commodity_list"] = temp["commodities_clean"].apply(
-        lambda s: [x.strip().title() for x in s.split(",") if x.strip() != ""]
+        lambda s: [x.strip() for x in s.split(",") if x.strip() != ""]
     )
+    
+    # --- AGGRESSIVE COMMODITY CLEANING/NORMALIZATION ---
+    def normalize_commodity_name(name):
+        name = name.lower().strip()
+        if not name:
+            return None
+        # Remove common extraneous words
+        name = re.sub(r' (data|group|s|\.)$', '', name).strip()
+        
+        # Consolidation mapping for common misspellings/variants
+        mapping = {
+            'cotton': 'Cotton',
+            'coton': 'Cotton',
+            'paddy': 'Paddy',
+            'padd': 'Paddy',
+            'wheat': 'Wheat',
+            'wheat and paddy': 'Wheat & Paddy',
+            'edible oil': 'Edible Oil',
+            'edibleoil': 'Edible Oil',
+            'fertilizers': 'Fertilizer',
+            'fertilizer': 'Fertilizer',
+            'pulses': 'Pulses',
+            'daal': 'Pulses',
+            'bajra': 'Bajra',
+            'lm': 'Livestock', # Assuming 'Lm' is short for Livestock marketing
+            'livestock': 'Livestock'
+        }
+        
+        # Apply mapping or title case if no map found
+        for key, value in mapping.items():
+            if key in name:
+                return value
+        
+        return name.title()
+
+    temp["commodity_list"] = temp["commodity_list"].apply(
+        lambda lst: [normalize_commodity_name(item) for item in lst if normalize_commodity_name(item) is not None]
+    )
+    # ---------------------------------------------------
+
     temp["n_commodities"] = temp["commodity_list"].apply(
         lambda lst: len(lst) if len(lst) > 0 else np.nan
     )
 
     temp = temp.explode("commodity_list")
     temp = temp[temp["commodity_list"].notna() & (temp["n_commodities"].notna())]
-    temp["amount_per_commodity"] = temp["amount_pkr"] / temp["n_commodities"]
     temp = temp.rename(columns={"commodity_list": "commodity"})
+    
+    # Re-calculate amount per commodity after cleaning/explosion
+    temp["amount_per_commodity"] = temp["amount_pkr"] / temp["n_commodities"]
     
     return temp[["date", "customer_name", "txn_type", "commodity", "amount_per_commodity", "amount_pkr"]]
 
@@ -99,7 +148,6 @@ def count_transactions(df, start, end):
     """Counts the number of unique transactions (rows in the raw data)."""
     mask = (df["date"] >= start) & (df["date"] <= end)
     return df.loc[mask].shape[0]
-
 
 # ==============================================================================
 # 3. DATA LOADING, FILTERING, AND PRE-CALCULATIONS
@@ -116,11 +164,11 @@ today = date.today()
 min_data_date = raw_df["date"].min()
 max_data_date = raw_df["date"].max()
 
-start_of_week = today - timedelta(days=today.weekday())
-start_of_month = today.replace(day=1)
 start_of_year = date(today.year, 1, 1)
-last_7_days_start = today - timedelta(days=6)
+last_30_days_start = today - timedelta(days=29) # 30 days including today
 
+def metric_format(value):
+    return f"{CURRENCY_CODE} {value:,.0f}"
 
 ## 📊 Top-Level Filters
 st.subheader("Reporting Filters")
@@ -150,106 +198,69 @@ if raw_df_filtered.empty or exploded_df_filtered.empty:
 
 st.markdown("---")
 
-
 # ==============================================================================
-# 4. KEY PERFORMANCE INDICATORS (KPIs) - Structured Logically
+# 4. KEY PERFORMANCE INDICATORS (KPIs) - STRUCTURED TABLES
 # ==============================================================================
 
 st.header("Key Performance Indicators (KPIs)")
 
-def metric_format(value):
-    return f"{CURRENCY_CODE} {value:,.0f}"
+## KPI Section 1: YTD Amount (On Top)
+st.subheader("Year-To-Date Cumulative Sales")
+ytd_amount = sum_between(raw_df, start_of_year, today)
 
-## KPI Section 1: Top Transaction Count Summary Table
-st.subheader("Transaction Count Summary (Today, Week, Month)")
-
-txn_data = {
-    "Period": ["Transactions Today", "Transactions This Week", "Transactions This Month"],
-    "Count": [
-        count_transactions(raw_df, today, today),
-        count_transactions(raw_df, start_of_week, today),
-        count_transactions(raw_df, start_of_month, today)
-    ]
-}
-txn_df = pd.DataFrame(txn_data)
-
-# Transpose the DataFrame to get periods as columns
-txn_df_transposed = txn_df.set_index('Period').T 
-
-# Display using st.dataframe for a professional table look
-st.dataframe(
-    txn_df_transposed,
-    hide_index=True,
-    use_container_width=True
-)
-
-st.markdown("---")
-
-
-## KPI Section 2: Amount Metrics (Original format preserved)
-st.subheader("Current Activity Snapshot")
-kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
-
-with kpi_col1:
-    st.metric("**Transactions Today**", count_transactions(raw_df, today, today))
-    st.metric("**Amount Today**", metric_format(sum_between(raw_df, today, today)))
-
-with kpi_col2:
-    st.metric("**Last 7-Day Count**", count_transactions(raw_df, last_7_days_start, today))
-    st.metric("**Last 7-Day Amount**", metric_format(sum_between(raw_df, last_7_days_start, today)))
-
-with kpi_col3:
-    st.metric("**Current Week Count**", count_transactions(raw_df, start_of_week, today))
-    st.metric("**Current Week Amount**", metric_format(sum_between(raw_df, start_of_week, today)))
-
-with kpi_col4:
-    st.metric("**Current Month Count**", count_transactions(raw_df, start_of_month, today))
-    st.metric("**Current Month Amount**", metric_format(sum_between(raw_df, start_of_month, today)))
-
-st.markdown("---")
-
-## KPI Section 3: Cumulative Performance
-st.subheader("Cumulative Performance")
 kpi_col_ytd, _, _, _ = st.columns(4)
-
 with kpi_col_ytd:
-    st.metric("**YTD Transactions**", count_transactions(raw_df, start_of_year, today))
-    st.metric("**YTD Amount**", metric_format(sum_between(raw_df, start_of_year, today)))
+    st.metric("**YTD Total Sales**", metric_format(ytd_amount))
 
 st.markdown("---")
 
 
-# ==============================================================================
-# 5. VISUALIZATION: SALES TREND
-# ==============================================================================
+## KPI Section 2: Detailed Transaction Summaries
 
-st.header("Sales Trend Analysis")
+def create_summary_table(df, period_start, period_end, title):
+    """Generates a detailed table for a specific period."""
+    
+    # Filter the exploded data for the specific period
+    period_mask = (df["date"] >= period_start) & (df["date"] <= period_end)
+    summary_df = exploded_df.loc[period_mask].copy()
+    
+    # Group by customer and commodity to summarize the transaction
+    summary_df = summary_df.groupby(["customer_name", "commodity"])["amount_per_commodity"].sum().reset_index()
+    
+    summary_df = summary_df.rename(columns={
+        "customer_name": "Customer",
+        "commodity": "Commodity",
+        "amount_per_commodity": "Amount"
+    })
+    
+    # Sort and format the output
+    summary_df = summary_df.sort_values("Amount", ascending=False)
+    
+    # Apply styling for better presentation
+    styled_df = summary_df.style.format({
+        "Amount": f"{CURRENCY_CODE} {{:,.0f}}",
+    })
 
-daily_summary = (
-    raw_df_filtered.groupby("date")["amount_pkr"]
-    .sum()
-    .reset_index()
-    .rename(columns={"amount_pkr": "Total_Sales"})
-    .sort_values("date")
-)
+    st.subheader(f"{title} (Transactions: {count_transactions(raw_df, period_start, period_end)})")
+    st.dataframe(styled_df, use_container_width=True, hide_index=True)
 
-chart_trend = alt.Chart(daily_summary).mark_line(point=True).encode(
-    x=alt.X("date:T", title="Date", axis=alt.Axis(format="%b %d, %Y")),
-    y=alt.Y("Total_Sales:Q", title=f"Total Sales ({CURRENCY_CODE})", axis=alt.Axis(format=CURRENCY_FORMAT)),
-    tooltip=[
-        alt.Tooltip("date:T", title="Date"),
-        alt.Tooltip("Total_Sales:Q", title="Amount", format=CURRENCY_FORMAT)
-    ]
-).properties(
-    title=f"Daily Sales Volume: {filter_start_date.strftime('%b %d, %Y')} to {filter_end_date.strftime('%b %d, %Y')}"
-).interactive()
 
-st.altair_chart(chart_trend, use_container_width=True)
+col_today, col_30days, col_year = st.columns(3)
+
+with col_today:
+    create_summary_table(exploded_df, today, today, "Today's Sales Breakdown")
+    
+with col_30days:
+    create_summary_table(exploded_df, last_30_days_start, today, "Last 30 Days Sales Breakdown")
+
+with col_year:
+    # Use YTD for the third column, as Today and 30 days are already covered
+    create_summary_table(exploded_df, start_of_year, today, "YTD Sales Breakdown")
+    
 
 st.markdown("---")
-
 # ==============================================================================
-# 6. VISUALIZATION: COMMODITY BREAKDOWN
+# 5. VISUALIZATION: COMMODITY BREAKDOWN (Original chart kept, trend removed)
 # ==============================================================================
 
 st.header("Commodity Performance & Mix")
@@ -280,6 +291,7 @@ with col_chart:
 
     top_commodity_summary = commodity_summary.head(top_n)
 
+    # Altair Bar Chart
     chart_bar = alt.Chart(top_commodity_summary).mark_bar().encode(
         x=alt.X("Amount:Q", title=f"Total Sales ({CURRENCY_CODE})", axis=alt.Axis(format=CURRENCY_FORMAT)),
         y=alt.Y("commodity:N", sort="-x", title="Commodity"),
@@ -307,7 +319,7 @@ with col_table:
 st.markdown("---")
 
 # ==============================================================================
-# 7. DATA EXPLORER
+# 6. DATA EXPLORER
 # ==============================================================================
 
 st.header("Data Explorer: Transaction and Commodity Detail")
@@ -329,6 +341,7 @@ if data_choice == "Raw Transactions (Total Amount)":
 
 else:
     st.subheader("Exploded Commodity Data")
+    # Use the filtered data for display, but show the cleaned commodity name
     df_display = exploded_df_filtered.sort_values(["date", "customer_name"], ascending=False).drop(columns=['amount_pkr'], errors='ignore')
 
     styled_df = df_display.style.format({
