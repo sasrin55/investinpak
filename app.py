@@ -6,25 +6,41 @@ import numpy as np
 
 # ==============================================================================
 # 1. CONFIGURATION AND INITIAL SETUP
+# (Applying the new name and custom color theme)
 # ==============================================================================
 
 # --- SETTINGS ---
 SHEET_ID = "1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q"
 TAB_NAME = "Master"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={TAB_NAME}"
-CURRENCY_CODE = "PKR" # For professional labeling
-CURRENCY_FORMAT = "$,.0f" # Example format for PKR
+CURRENCY_CODE = "PKR"
+CURRENCY_FORMAT = "$,.0f" # Format for amount columns
 
+# --- CUSTOM THEME COLORS based on the PAR website (Dark Teal/Green scheme) ---
+PAR_PRIMARY = "#006B3F" # Dark Teal/Green for buttons, links, sliders
+PAR_BACKGROUND = "#F0F5F2" # Light Gray/Green background
+PAR_TEXT = "#101010" # Dark text color
+
+# Configure the page layout and theme
 st.set_page_config(
-    page_title="Sales Performance Dashboard",
+    page_title="Zaraimandi Sales Dashboard", # Updated Title
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed", # Ensure sidebar is hidden
+    
+    theme={
+        "primaryColor": PAR_PRIMARY,
+        "backgroundColor": PAR_BACKGROUND,
+        "secondaryBackgroundColor": "#FFFFFF", # White background for charts/tables
+        "textColor": PAR_TEXT,
+        "font": "sans serif"
+    }
 )
 
 # --- Title and Header ---
-st.title("Enterprise Sales Performance Dashboard")
+st.title("Zaraimandi Sales Dashboard") # Updated Dashboard Title
 st.markdown("A unified view of transaction and commodity-level sales metrics.")
 st.markdown("---")
+
 
 # ==============================================================================
 # 2. DATA LOADING AND CLEANUP
@@ -40,75 +56,53 @@ def load_data():
         st.stop()
         return pd.DataFrame()
 
-    # Map columns by position (A, B, C, D, E, F...)
     cols = df.columns
     if len(cols) < 6:
         st.error(f"Data structure error: Expected at least 6 columns, found {len(cols)}. Check the '{TAB_NAME}' tab.")
         st.stop()
 
     rename_map = {
-        cols[0]: "date",
-        cols[1]: "customer_name",
-        cols[2]: "phone",
-        cols[3]: "txn_type",
-        cols[4]: "commodities",
-        cols[5]: "amount_pkr",
+        cols[0]: "date", cols[1]: "customer_name", cols[2]: "phone",
+        cols[3]: "txn_type", cols[4]: "commodities", cols[5]: "amount_pkr",
     }
     df = df.rename(columns=rename_map)
 
-    # Robust Cleaning and Conversion
     df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.date
     df["amount_pkr"] = pd.to_numeric(df["amount_pkr"], errors="coerce").fillna(0)
     df["txn_type"] = df["txn_type"].astype(str).str.strip().str.title()
     df["customer_name"] = df["customer_name"].astype(str).str.strip()
-
-    # Drop rows without a valid date
     df = df.dropna(subset=["date"])
 
     return df
 
 
 def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Splits transaction rows into one row per commodity, fairly allocating the total amount.
-    """
+    """Splits transaction rows into one row per commodity, fairly allocating the total amount."""
     if base_df.empty or "commodities" not in base_df.columns:
         return base_df.copy()
 
     temp = base_df.copy()
     temp["commodities"] = temp["commodities"].fillna("").astype(str)
-
-    # Normalize separators to commas using regex for robustness
     temp["commodities_clean"] = (
         temp["commodities"]
         .str.replace(r"[\s]*[&\/]| and ", ",", regex=True)
         .str.strip()
     )
 
-    # Build list of commodities and calculate count
     temp["commodity_list"] = temp["commodities_clean"].apply(
         lambda s: [x.strip().title() for x in s.split(",") if x.strip() != ""]
     )
     temp["n_commodities"] = temp["commodity_list"].apply(
-        lambda lst: len(lst) if len(lst) > 0 else np.nan # Use NaN for missing commodities
+        lambda lst: len(lst) if len(lst) > 0 else np.nan
     )
 
-    # Explode and filter out rows where no commodity was listed
     temp = temp.explode("commodity_list")
     temp = temp[temp["commodity_list"].notna() & (temp["n_commodities"].notna())]
-
-    # Allocate amount evenly
     temp["amount_per_commodity"] = temp["amount_pkr"] / temp["n_commodities"]
-
-    # Final cleanup
     temp = temp.rename(columns={"commodity_list": "commodity"})
     
     return temp[["date", "customer_name", "txn_type", "commodity", "amount_per_commodity", "amount_pkr"]]
 
-
-# ==============================================================================
-# 3. METRICS AND DATE LOGIC
-# ==============================================================================
 
 def sum_between(df, start, end, amount_col="amount_pkr"):
     """Calculates the sum of amount between two dates (inclusive)."""
@@ -120,8 +114,9 @@ def count_transactions(df, start, end):
     mask = (df["date"] >= start) & (df["date"] <= end)
     return df.loc[mask].shape[0]
 
+
 # ==============================================================================
-# 4. DATA LOADING, FILTERING, AND PRE-CALCULATIONS
+# 3. DATA LOADING, FILTERING, AND PRE-CALCULATIONS
 # ==============================================================================
 
 raw_df = load_data()
@@ -141,16 +136,19 @@ start_of_year = date(today.year, 1, 1)
 last_7_days_start = today - timedelta(days=6)
 
 
-# --- SIDEBAR FILTERS (Key for Enterprise Dashboards) ---
-st.sidebar.header("Data Filter Selection")
+## 📊 Top-Level Filters
+st.subheader("Reporting Filters")
+filter_cols = st.columns([1, 2.5, 0.5])
 
-# Date range selector
-date_range = st.sidebar.date_input(
-    "Reporting Period",
-    value=(min_data_date, today),
-    min_value=min_data_date,
-    max_value=max_data_date
-)
+# 1. Date range selector
+with filter_cols[0]:
+    date_range = st.date_input(
+        "Reporting Period",
+        value=(min_data_date, today),
+        min_value=min_data_date,
+        max_value=max_data_date,
+        key="top_date_filter"
+    )
 
 filter_start_date = min(date_range)
 filter_end_date = max(date_range) if len(date_range) == 2 else date_range[0]
@@ -159,13 +157,15 @@ filter_end_date = max(date_range) if len(date_range) == 2 else date_range[0]
 raw_df_filtered = raw_df[(raw_df["date"] >= filter_start_date) & (raw_df["date"] <= filter_end_date)]
 exploded_df_filtered = exploded_df[(exploded_df["date"] >= filter_start_date) & (exploded_df["date"] <= filter_end_date)]
 
-# Commodity filter (based on currently available data)
-available_commodities = sorted(exploded_df_filtered["commodity"].unique().tolist())
-selected_commodities = st.sidebar.multiselect(
-    "Filter by Commodity Type",
-    options=available_commodities,
-    default=available_commodities # Default to All
-)
+# 2. Commodity filter
+with filter_cols[1]:
+    available_commodities = sorted(exploded_df_filtered["commodity"].unique().tolist())
+    selected_commodities = st.multiselect(
+        "Filter by Commodity Type",
+        options=available_commodities,
+        default=available_commodities,
+        key="top_commodity_filter"
+    )
 
 if selected_commodities:
     exploded_df_filtered = exploded_df_filtered[exploded_df_filtered["commodity"].isin(selected_commodities)]
@@ -174,42 +174,53 @@ if raw_df_filtered.empty or exploded_df_filtered.empty:
     st.warning("No data matches the current filter criteria. Please adjust your selections.")
     st.stop()
 
+st.markdown("---")
+
+
 # ==============================================================================
-# 5. KEY PERFORMANCE INDICATORS (KPIs)
+# 4. KEY PERFORMANCE INDICATORS (KPIs) - Structured Logically
 # ==============================================================================
 
-st.subheader(f"Current Period KPIs (Through {today.strftime('%b %d, %Y')})")
+st.header("Key Performance Indicators (KPIs)")
 
-col1, col2, col3, col4, col5 = st.columns(5)
-
-# Helper function for metric formatting
 def metric_format(value):
     return f"{CURRENCY_CODE} {value:,.0f}"
 
-with col1:
-    st.metric("Transactions Today", count_transactions(raw_df, today, today))
-    st.metric("Amount Today", metric_format(sum_between(raw_df, today, today)))
+## KPI Section 1: Current Activity Snapshot
+st.subheader("Current Activity Snapshot")
+kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
 
-with col2:
-    st.metric("Last 7-Day Count", count_transactions(raw_df, last_7_days_start, today))
-    st.metric("Last 7-Day Amount", metric_format(sum_between(raw_df, last_7_days_start, today)))
+with kpi_col1:
+    st.metric("**Transactions Today**", count_transactions(raw_df, today, today))
+    st.metric("**Amount Today**", metric_format(sum_between(raw_df, today, today)))
 
-with col3:
-    st.metric("Current Week Count", count_transactions(raw_df, start_of_week, today))
-    st.metric("Current Week Amount", metric_format(sum_between(raw_df, start_of_week, today)))
+with kpi_col2:
+    st.metric("**Last 7-Day Count**", count_transactions(raw_df, last_7_days_start, today))
+    st.metric("**Last 7-Day Amount**", metric_format(sum_between(raw_df, last_7_days_start, today)))
 
-with col4:
-    st.metric("Current Month Count", count_transactions(raw_df, start_of_month, today))
-    st.metric("Current Month Amount", metric_format(sum_between(raw_df, start_of_month, today)))
+with kpi_col3:
+    st.metric("**Current Week Count**", count_transactions(raw_df, start_of_week, today))
+    st.metric("**Current Week Amount**", metric_format(sum_between(raw_df, start_of_week, today)))
 
-with col5:
-    st.metric("YTD Count", count_transactions(raw_df, start_of_year, today))
-    st.metric("YTD Amount", metric_format(sum_between(raw_df, start_of_year, today)))
+with kpi_col4:
+    st.metric("**Current Month Count**", count_transactions(raw_df, start_of_month, today))
+    st.metric("**Current Month Amount**", metric_format(sum_between(raw_df, start_of_month, today)))
 
 st.markdown("---")
 
+## KPI Section 2: Cumulative Performance
+st.subheader("Cumulative Performance")
+kpi_col_ytd, _, _, _ = st.columns(4)
+
+with kpi_col_ytd:
+    st.metric("**YTD Transactions**", count_transactions(raw_df, start_of_year, today))
+    st.metric("**YTD Amount**", metric_format(sum_between(raw_df, start_of_year, today)))
+
+st.markdown("---")
+
+
 # ==============================================================================
-# 6. VISUALIZATION: SALES TREND
+# 5. VISUALIZATION: SALES TREND
 # ==============================================================================
 
 st.header("Sales Trend Analysis")
@@ -222,7 +233,7 @@ daily_summary = (
     .sort_values("date")
 )
 
-# Altair Line Chart for professional look and interactivity
+# Altair Line Chart for professional look
 chart_trend = alt.Chart(daily_summary).mark_line(point=True).encode(
     x=alt.X("date:T", title="Date", axis=alt.Axis(format="%b %d, %Y")),
     y=alt.Y("Total_Sales:Q", title=f"Total Sales ({CURRENCY_CODE})", axis=alt.Axis(format=CURRENCY_FORMAT)),
@@ -232,19 +243,18 @@ chart_trend = alt.Chart(daily_summary).mark_line(point=True).encode(
     ]
 ).properties(
     title=f"Daily Sales Volume: {filter_start_date.strftime('%b %d, %Y')} to {filter_end_date.strftime('%b %d, %Y')}"
-).interactive() # Allows Zoom/Pan
+).interactive()
 
 st.altair_chart(chart_trend, use_container_width=True)
 
 st.markdown("---")
 
 # ==============================================================================
-# 7. VISUALIZATION: COMMODITY BREAKDOWN
+# 6. VISUALIZATION: COMMODITY BREAKDOWN
 # ==============================================================================
 
 st.header("Commodity Performance & Mix")
 
-# Commodity summary – uses the split amount
 commodity_summary = (
     exploded_df_filtered.groupby("commodity")["amount_per_commodity"]
     .sum()
@@ -257,9 +267,18 @@ col_chart, col_table = st.columns([2, 1])
 
 with col_chart:
     st.subheader("Top Selling Commodities (Volume)")
+
+    max_commodities = len(commodity_summary)
+    top_n_default = min(10, max_commodities)
     
-    top_n = st.slider("Select Top N Commodities to Display", 5, len(commodity_summary), 10, key="top_n_slider")
-    
+    top_n = st.slider(
+        "Select Top N Commodities to Display", 
+        1, 
+        max_commodities, 
+        top_n_default, 
+        key="top_n_slider"
+    )
+
     top_commodity_summary = commodity_summary.head(top_n)
 
     # Altair Bar Chart
@@ -277,7 +296,6 @@ with col_chart:
 
 with col_table:
     st.subheader("Summary Table")
-    # Use pandas style to apply currency formatting
     styled_df = commodity_summary.style.format({
         "Amount": f"{CURRENCY_CODE} {{:,.0f}}",
     })
@@ -291,13 +309,12 @@ with col_table:
 st.markdown("---")
 
 # ==============================================================================
-# 8. DATA EXPLORER
+# 7. DATA EXPLORER
 # ==============================================================================
 
 st.header("Data Explorer: Transaction and Commodity Detail")
 st.caption(f"Showing data for period: {filter_start_date.strftime('%b %d, %Y')} to {filter_end_date.strftime('%b %d, %Y')}")
 
-# Select box for data view
 data_choice = st.selectbox(
     "Select Data View:",
     options=["Raw Transactions (Total Amount)", "Exploded Data (Commodity Level Amount)"]
@@ -305,10 +322,8 @@ data_choice = st.selectbox(
 
 if data_choice == "Raw Transactions (Total Amount)":
     st.subheader("Raw Transaction Data")
-    # Prepare data for display
     df_display = raw_df_filtered.sort_values("date", ascending=False).drop(columns=['phone'], errors='ignore')
-    
-    # Apply styling
+
     styled_df = df_display.style.format({
         "amount_pkr": f"{CURRENCY_CODE} {{:,.0f}}",
     })
@@ -316,10 +331,8 @@ if data_choice == "Raw Transactions (Total Amount)":
 
 else:
     st.subheader("Exploded Commodity Data")
-    # Prepare data for display
     df_display = exploded_df_filtered.sort_values(["date", "customer_name"], ascending=False).drop(columns=['amount_pkr'], errors='ignore')
 
-    # Apply styling
     styled_df = df_display.style.format({
         "amount_per_commodity": f"{CURRENCY_CODE} {{:,.0f}}",
     })
