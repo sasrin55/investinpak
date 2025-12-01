@@ -15,27 +15,45 @@ CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:cs
 CURRENCY_CODE = "PKR"
 CURRENCY_FORMAT = "$,.0f"
 
-# --- CUSTOM THEME COLORS (Dark Teal/Green scheme) ---
-PAR_PRIMARY = "#006B3F" # Dark Teal/Green for buttons, links, sliders
-PAR_BACKGROUND = "#F0F5F2" # Light Gray/Green background
-PAR_TEXT = "#101010" # Dark text color
+# --- CUSTOM THEME COLORS ---
+PAR_PRIMARY = "#006B3F"      # Dark Teal/Green (Buttons, Sliders, Highlights)
+PAR_BACKGROUND = "#F0F5F2"   # Light Gray/Green background
 
-# Configure the page layout and theme
-# ----------------------------------------------------------------------
-# FIX APPLIED HERE: Theme parameters passed directly to st.set_page_config
-# ----------------------------------------------------------------------
+# Configure the page layout (removed problematic theme args)
 st.set_page_config(
     page_title="Zaraimandi Sales Dashboard",
     layout="wide",
     initial_sidebar_state="collapsed",
-    
-    # Theme parameters MUST be passed directly (this resolves the TypeError)
-    primaryColor=PAR_PRIMARY,
-    backgroundColor=PAR_BACKGROUND,
-    secondaryBackgroundColor="#FFFFFF", 
-    textColor=PAR_TEXT,
-    font="sans serif"
 )
+
+# --- CSS Injection for Robust Theming ---
+st.markdown(f"""
+<style>
+    /* Set Primary Color for buttons, selections, etc. */
+    .stButton>button, .stSlider .st-bd, .stMultiSelect [data-baseweb="tag"] > span {{
+        background-color: {PAR_PRIMARY};
+        color: white;
+    }}
+    .stSelectbox div[data-baseweb="select"] {{
+        border-color: {PAR_PRIMARY};
+    }}
+    /* Set overall background color */
+    [data-testid="stAppViewContainer"] {{
+        background-color: {PAR_BACKGROUND};
+    }}
+    /* Ensure Streamlit containers (like metric boxes) are white for contrast */
+    [data-testid="stVerticalBlock"] {{
+        background-color: #FFFFFF;
+        padding: 1rem;
+        border-radius: 0.5rem;
+    }}
+    /* Style headers */
+    h1, h2, h3, h4 {{
+        color: {PAR_PRIMARY};
+    }}
+</style>
+""", unsafe_allow_html=True)
+# ----------------------------------------
 
 # --- Title and Header ---
 st.title("Zaraimandi Sales Dashboard")
@@ -117,7 +135,7 @@ def count_transactions(df, start, end):
 
 
 # ==============================================================================
-# 3. DATA LOADING, FILTERING, AND PRE-CALCULATIONS (Functions remain the same)
+# 3. DATA LOADING, FILTERING, AND PRE-CALCULATIONS
 # ==============================================================================
 
 raw_df = load_data()
@@ -179,7 +197,7 @@ st.markdown("---")
 
 
 # ==============================================================================
-# 4. KEY PERFORMANCE INDICATORS (KPIs) - Structured Logically (Functions remain the same)
+# 4. KEY PERFORMANCE INDICATORS (KPIs) - Structured Logically
 # ==============================================================================
 
 st.header("Key Performance Indicators (KPIs)")
@@ -221,7 +239,7 @@ st.markdown("---")
 
 
 # ==============================================================================
-# 5. VISUALIZATION: SALES TREND (Functions remain the same)
+# 5. VISUALIZATION: SALES TREND
 # ==============================================================================
 
 st.header("Sales Trend Analysis")
@@ -250,7 +268,7 @@ st.altair_chart(chart_trend, use_container_width=True)
 st.markdown("---")
 
 # ==============================================================================
-# 6. VISUALIZATION: COMMODITY BREAKDOWN (Functions remain the same)
+# 6. VISUALIZATION: COMMODITY BREAKDOWN
 # ==============================================================================
 
 st.header("Commodity Performance & Mix")
@@ -308,7 +326,7 @@ with col_table:
 st.markdown("---")
 
 # ==============================================================================
-# 7. DATA EXPLORER (Functions remain the same)
+# 7. DATA EXPLORER
 # ==============================================================================
 
 st.header("Data Explorer: Transaction and Commodity Detail")
