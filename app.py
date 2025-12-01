@@ -102,8 +102,8 @@ def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
         # Hardcoded list of items to REMOVE (non-commodities or internal tracking)
         NON_COMMODITY_KEYWORDS = [
             'unknown', 'not confirm yet', 'discussion', 'contact sale', 
-            'live market', 'data', 'group', 'g', 'um', 'l m', 'lm', # common internal/tracking codes
-            'fruits', 'fruit', 'vegetables', 'vegetable' # Use singular/plural variants for safety if not in mapping
+            'live market', 'data', 'group', 'g', 'um', 'l m', 'lm', 
+            'fruits', 'fruit', 'vegetables', 'vegetable' 
         ]
         
         if any(keyword in name for keyword in NON_COMMODITY_KEYWORDS):
@@ -135,7 +135,6 @@ def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
             if name == key:
                 return value
         
-        # If still not found and not excluded, return Title Case version
         return name.title()
 
     temp["commodity_list"] = temp["commodity_list"].apply(
@@ -169,7 +168,7 @@ def count_transactions(df, start, end):
 
 
 # ==============================================================================
-# 3. DATA LOADING, FILTERING, AND PRE-CALCULATIONS (Functions remain the same)
+# 3. DATA LOADING, FILTERING, AND PRE-CALCULATIONS
 # ==============================================================================
 
 raw_df = load_data()
@@ -264,7 +263,7 @@ col_today, col_30days, col_ytd_tables = st.columns(3)
 
 # 1. SALES TODAY
 with col_today:
-    # --- ADDED: Today Amount Metric ---
+    # Today Amount Metric
     st.subheader("Today's Total Sales")
     today_amount = sum_between(raw_df, today, today)
     st.metric("**Total Today's Sales**", metric_format(today_amount))
@@ -274,7 +273,7 @@ with col_today:
     
 # 2. LAST 30 DAYS
 with col_30days:
-    # --- ADDED: Last 30 Days Amount Metric ---
+    # Last 30 Days Amount Metric
     st.subheader("Last 30 Days Total Sales")
     last_30_amount = sum_between(raw_df, last_30_days_start, today)
     st.metric("**Total Last 30 Days Sales**", metric_format(last_30_amount))
@@ -297,46 +296,58 @@ with col_ytd_tables:
 st.markdown("---")
 
 # ==============================================================================
-# 5. REPEAT CUSTOMERS BY COMMODITY (Functions remain the same)
+# 5. REPEAT CUSTOMERS BY COMMODITY (MODIFIED FOR COMMODITY COUNT)
 # ==============================================================================
 
-st.header("Customer Loyalty Analysis")
+st.header("Commodity Loyalty Analysis")
+st.markdown("Analyzes commodity performance based on the count of unique **New** vs. **Repeat** buyers across the entire dataset.")
 
-repeat_customer_analysis = (
+# 1. Calculate transaction count per customer per commodity
+txn_count_by_customer_commodity = (
     exploded_df.groupby(["customer_name", "commodity"])["date"].nunique().reset_index()
 )
-repeat_customer_analysis.rename(columns={"date": "Total Transactions"}, inplace=True)
+txn_count_by_customer_commodity.rename(columns={"date": "Transaction Count"}, inplace=True)
 
-# Filter for customers with more than one transaction for the same commodity
-repeat_customer_analysis = repeat_customer_analysis[repeat_customer_analysis["Total Transactions"] > 1]
+# 2. Determine Buyer Type (New vs. Repeat) for each customer-commodity pair
+# A buyer is 'Repeat' if their Transaction Count for that commodity > 1.
+# A buyer is 'New' if their Transaction Count for that commodity == 1.
 
-if not repeat_customer_analysis.empty:
-    
-    # Summarize the total amount spent by these repeat customers on that commodity
-    amount_spent = exploded_df.groupby(["customer_name", "commodity"])["amount_per_commodity"].sum().reset_index()
-    
-    # Merge transaction count with total amount
-    repeat_customer_analysis = pd.merge(
-        repeat_customer_analysis, 
-        amount_spent, 
-        on=["customer_name", "commodity"]
-    )
-    repeat_customer_analysis.rename(columns={"amount_per_commodity": f"Total Amount ({CURRENCY_CODE})"}, inplace=True)
-    
-    repeat_customer_analysis = repeat_customer_analysis.sort_values(
-        f"Total Amount ({CURRENCY_CODE})", ascending=False
-    )
-    
-    st.subheader("Repeat Buyers (Multiple Transactions for Same Commodity)")
-    st.markdown("Identifies customers with strong loyalty to a specific commodity.")
+txn_count_by_customer_commodity["Buyer Type"] = np.where(
+    txn_count_by_customer_commodity["Transaction Count"] > 1, 
+    "Repeat", 
+    "New"
+)
 
-    styled_df = repeat_customer_analysis.style.format({
-        f"Total Amount ({CURRENCY_CODE})": f"{CURRENCY_CODE} {{:,.0f}}"
-    })
-    
-    st.dataframe(styled_df, use_container_width=True, hide_index=True)
+# 3. Group by Commodity and Buyer Type, then count unique customers
+loyalty_summary = (
+    txn_count_by_customer_commodity.groupby(["commodity", "Buyer Type"])
+    .size()
+    .unstack(fill_value=0) # Pivot 'New' and 'Repeat' into columns
+)
+
+# 4. Ensure both columns exist for consistency
+if 'New' not in loyalty_summary.columns:
+    loyalty_summary['New'] = 0
+if 'Repeat' not in loyalty_summary.columns:
+    loyalty_summary['Repeat'] = 0
+
+loyalty_summary = loyalty_summary[['Repeat', 'New']] # Order columns
+
+# 5. Calculate Total Buyers (unique customers)
+loyalty_summary['Total Buyers'] = loyalty_summary['Repeat'] + loyalty_summary['New']
+
+# 6. Final cleanup and sorting by Repeat count
+loyalty_summary = loyalty_summary.reset_index()
+loyalty_summary = loyalty_summary.sort_values("Repeat", ascending=False)
+loyalty_summary.rename(columns={"Repeat": "Repeat Buyers", "New": "New Buyers"}, inplace=True)
+
+st.subheader("Commodity Buyer Loyalty (Ranked by Repeat Buyers)")
+
+if not loyalty_summary.empty:
+    st.dataframe(loyalty_summary, use_container_width=True, hide_index=True)
 else:
-    st.info("No repeat customers found for the same commodity across the entire dataset.")
+    st.info("No sales data available to analyze buyer loyalty.")
+
 
 st.markdown("---")
 
