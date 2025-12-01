@@ -29,7 +29,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
     
-    # Theme parameters passed directly (this resolves the TypeError)
+    # Theme parameters MUST be passed directly (this resolves the TypeError)
     primaryColor=PAR_PRIMARY,
     backgroundColor=PAR_BACKGROUND,
     secondaryBackgroundColor="#FFFFFF", 
@@ -44,7 +44,7 @@ st.markdown("---")
 
 
 # ==============================================================================
-# 2. DATA LOADING AND CLEANUP (No functional changes)
+# 2. DATA LOADING AND CLEANUP (Functions remain the same)
 # ==============================================================================
 
 @st.cache_data(show_spinner="Connecting to Data Source and Loading...")
@@ -117,7 +117,7 @@ def count_transactions(df, start, end):
 
 
 # ==============================================================================
-# 3. DATA LOADING, FILTERING, AND PRE-CALCULATIONS (No functional changes)
+# 3. DATA LOADING, FILTERING, AND PRE-CALCULATIONS (Functions remain the same)
 # ==============================================================================
 
 raw_df = load_data()
@@ -179,7 +179,7 @@ st.markdown("---")
 
 
 # ==============================================================================
-# 4. KEY PERFORMANCE INDICATORS (KPIs) - Structured Logically
+# 4. KEY PERFORMANCE INDICATORS (KPIs) - Structured Logically (Functions remain the same)
 # ==============================================================================
 
 st.header("Key Performance Indicators (KPIs)")
@@ -221,7 +221,7 @@ st.markdown("---")
 
 
 # ==============================================================================
-# 5. VISUALIZATION: SALES TREND
+# 5. VISUALIZATION: SALES TREND (Functions remain the same)
 # ==============================================================================
 
 st.header("Sales Trend Analysis")
@@ -250,7 +250,7 @@ st.altair_chart(chart_trend, use_container_width=True)
 st.markdown("---")
 
 # ==============================================================================
-# 6. VISUALIZATION: COMMODITY BREAKDOWN
+# 6. VISUALIZATION: COMMODITY BREAKDOWN (Functions remain the same)
 # ==============================================================================
 
 st.header("Commodity Performance & Mix")
@@ -308,7 +308,7 @@ with col_table:
 st.markdown("---")
 
 # ==============================================================================
-# 7. DATA EXPLORER (No functional changes)
+# 7. DATA EXPLORER (Functions remain the same)
 # ==============================================================================
 
 st.header("Data Explorer: Transaction and Commodity Detail")
