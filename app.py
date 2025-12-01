@@ -1,277 +1,289 @@
 import pandas as pd
 import streamlit as st
 from datetime import date, timedelta
-import altair as alt # For more advanced charting
+import altair as alt
+import numpy as np
 
 # ==============================================================================
-# 1. SETTINGS AND CONFIGURATION
+# 1. CONFIGURATION AND INITIAL SETUP
 # ==============================================================================
 
-# Use Streamlit secrets for sensitive information (Recommended in production)
-# st.secrets['sheet_id'] or similar for production
+# --- SETTINGS ---
 SHEET_ID = "1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q"
 TAB_NAME = "Master"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={TAB_NAME}"
-CURRENCY_SYMBOL = "₹" # Added a setting for currency
+CURRENCY_CODE = "PKR" # For professional labeling
+CURRENCY_FORMAT = "$,.0f" # Example format for PKR
 
 st.set_page_config(
-    page_title="💰 Pro Sales Tracker Dashboard",
+    page_title="Sales Performance Dashboard",
     layout="wide",
-    initial_sidebar_state="expanded" # Start with sidebar open
+    initial_sidebar_state="expanded"
 )
-st.title("💰 Pro Sales Tracker Dashboard")
+
+# --- Title and Header ---
+st.title("Enterprise Sales Performance Dashboard")
+st.markdown("A unified view of transaction and commodity-level sales metrics.")
+st.markdown("---")
 
 # ==============================================================================
 # 2. DATA LOADING AND CLEANUP
 # ==============================================================================
 
-@st.cache_data(show_spinner="Connecting to Google Sheet and loading data...")
+@st.cache_data(show_spinner="Connecting to Data Source and Loading...")
 def load_data():
-    """Reads data, renames columns, and cleans/converts data types."""
+    """Reads data, renames columns, and cleans data types."""
     try:
-        # Read Google Sheet as CSV
         df = pd.read_csv(CSV_URL)
     except Exception as e:
-        st.error(f"❌ **Error loading data.** Check if the Google Sheet ID is correct and publicly shared. Details: {e}")
+        st.error(f"Error connecting to Google Sheet. Check ID, tab name, and permissions. Details: {e}")
         st.stop()
-        return pd.DataFrame() # Return empty DataFrame on failure
+        return pd.DataFrame()
 
+    # Map columns by position (A, B, C, D, E, F...)
     cols = df.columns
-
-    # Check for expected number of columns (Improved error message)
     if len(cols) < 6:
-        st.error(f"⚠️ Expected at least 6 columns, but found only {len(cols)}. Check the sheet tab name and header row.")
+        st.error(f"Data structure error: Expected at least 6 columns, found {len(cols)}. Check the '{TAB_NAME}' tab.")
         st.stop()
 
-    # Define robust column renaming by position
     rename_map = {
         cols[0]: "date",
-        cols[1]: "name",
+        cols[1]: "customer_name",
         cols[2]: "phone",
         cols[3]: "txn_type",
         cols[4]: "commodities",
-        cols[5]: "amount",
+        cols[5]: "amount_pkr",
     }
     df = df.rename(columns=rename_map)
 
-    # Clean and convert data types (Improved conversion with robust error handling)
+    # Robust Cleaning and Conversion
     df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.date
-    df["amount"] = pd.to_numeric(df["amount"], errors="coerce").fillna(0)
-    df["name"] = df["name"].astype(str).str.strip()
-    df["txn_type"] = df["txn_type"].astype(str).str.strip().str.title() # Normalize case
+    df["amount_pkr"] = pd.to_numeric(df["amount_pkr"], errors="coerce").fillna(0)
+    df["txn_type"] = df["txn_type"].astype(str).str.strip().str.title()
+    df["customer_name"] = df["customer_name"].astype(str).str.strip()
 
     # Drop rows without a valid date
-    initial_rows = len(df)
     df = df.dropna(subset=["date"])
-    st.sidebar.info(f"Loaded {len(df)} records. Dropped {initial_rows - len(df)} rows with invalid dates.")
 
     return df
 
-def explode_commodities(df):
-    """Explodes grouped commodities into one row per commodity."""
-    if df.empty or "commodities" not in df.columns:
-        return df
 
-    temp = df.copy()
+def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Splits transaction rows into one row per commodity, fairly allocating the total amount.
+    """
+    if base_df.empty or "commodities" not in base_df.columns:
+        return base_df.copy()
+
+    temp = base_df.copy()
     temp["commodities"] = temp["commodities"].fillna("").astype(str)
 
-    # Robust normalization: standard separators and then split
-    temp["commodities"] = (
+    # Normalize separators to commas using regex for robustness
+    temp["commodities_clean"] = (
         temp["commodities"]
-        .str.replace(r"[\s]*[&\/]| and ", ",", regex=True) # Replaced fixed strings with regex for better coverage
+        .str.replace(r"[\s]*[&\/]| and ", ",", regex=True)
         .str.strip()
     )
 
-    # Split into lists, explode, and strip whitespace again
-    temp["commodities"] = temp["commodities"].str.split(",")
-    temp = temp.explode("commodities")
-    temp["commodities"] = temp["commodities"].str.strip().str.title() # Normalize commodity names
+    # Build list of commodities and calculate count
+    temp["commodity_list"] = temp["commodities_clean"].apply(
+        lambda s: [x.strip().title() for x in s.split(",") if x.strip() != ""]
+    )
+    temp["n_commodities"] = temp["commodity_list"].apply(
+        lambda lst: len(lst) if len(lst) > 0 else np.nan # Use NaN for missing commodities
+    )
 
-    # Remove empty rows after stripping
-    temp = temp[temp["commodities"] != ""]
+    # Explode and filter out rows where no commodity was listed
+    temp = temp.explode("commodity_list")
+    temp = temp[temp["commodity_list"].notna() & (temp["n_commodities"].notna())]
 
-    return temp
+    # Allocate amount evenly
+    temp["amount_per_commodity"] = temp["amount_pkr"] / temp["n_commodities"]
+
+    # Final cleanup
+    temp = temp.rename(columns={"commodity_list": "commodity"})
+    
+    return temp[["date", "customer_name", "txn_type", "commodity", "amount_per_commodity", "amount_pkr"]]
+
 
 # ==============================================================================
-# 3. HELPER FUNCTIONS FOR METRICS
+# 3. METRICS AND DATE LOGIC
 # ==============================================================================
 
-def sum_between(df, start, end):
-    """Calculates the sum of 'amount' between two dates (inclusive)."""
+def sum_between(df, start, end, amount_col="amount_pkr"):
+    """Calculates the sum of amount between two dates (inclusive)."""
     mask = (df["date"] >= start) & (df["date"] <= end)
-    return df.loc[mask, "amount"].sum()
+    return df.loc[mask, amount_col].sum()
 
-def count_between(df, start, end):
-    """Counts the number of unique transactions between two dates (inclusive)."""
-    # Use the raw dataframe for unique transaction count to avoid counting exploded rows
-    mask = (raw_df["date"] >= start) & (raw_df["date"] <= end)
-    # Assuming each row in raw_df is one unique transaction
-    return raw_df.loc[mask].shape[0]
+def count_transactions(df, start, end):
+    """Counts the number of unique transactions (rows in the raw data)."""
+    mask = (df["date"] >= start) & (df["date"] <= end)
+    return df.loc[mask].shape[0]
 
 # ==============================================================================
-# 4. DATA PROCESSING AND DATE CALCULATIONS
+# 4. DATA LOADING, FILTERING, AND PRE-CALCULATIONS
 # ==============================================================================
 
-# Load and process data
-raw_df = load_data() # Load the data first
-df = explode_commodities(raw_df) # Then explode for commodity analysis
+raw_df = load_data()
+exploded_df = explode_commodities(raw_df)
 
-# Stop if data loading failed or DataFrame is empty
 if raw_df.empty:
     st.stop()
 
-# Date calculations
+# Date Calculations
 today = date.today()
+min_data_date = raw_df["date"].min()
+max_data_date = raw_df["date"].max()
+
 start_of_week = today - timedelta(days=today.weekday())
 start_of_month = today.replace(day=1)
 start_of_year = date(today.year, 1, 1)
-last_7_days = today - timedelta(days=6)
+last_7_days_start = today - timedelta(days=6)
 
-# Find the earliest date in the data for filtering
-min_date = raw_df["date"].min()
-max_date = raw_df["date"].max()
 
-# ==============================================================================
-# 5. SIDEBAR FILTERS (USER INTERACTIVITY)
-# ==============================================================================
-
-st.sidebar.header("📊 Data Filters")
+# --- SIDEBAR FILTERS (Key for Enterprise Dashboards) ---
+st.sidebar.header("Data Filter Selection")
 
 # Date range selector
 date_range = st.sidebar.date_input(
-    "Select a Date Range",
-    value=(min_date, today),
-    min_value=min_date,
-    max_value=max_date
+    "Reporting Period",
+    value=(min_data_date, today),
+    min_value=min_data_date,
+    max_value=max_data_date
 )
 
-# Ensure the tuple has two dates
-if len(date_range) == 2:
-    filter_start_date = min(date_range)
-    filter_end_date = max(date_range)
-else:
-    # Handle single date selection (use it as start and end)
-    filter_start_date = date_range[0]
-    filter_end_date = date_range[0]
+filter_start_date = min(date_range)
+filter_end_date = max(date_range) if len(date_range) == 2 else date_range[0]
 
-# Apply date range filter to both raw and exploded data
+# Apply date filter to both dataframes
 raw_df_filtered = raw_df[(raw_df["date"] >= filter_start_date) & (raw_df["date"] <= filter_end_date)]
-df_filtered = df[(df["date"] >= filter_start_date) & (df["date"] <= filter_end_date)]
+exploded_df_filtered = exploded_df[(exploded_df["date"] >= filter_start_date) & (exploded_df["date"] <= filter_end_date)]
 
-# Commodity multiselect filter (based on currently filtered data)
-available_commodities = sorted(df_filtered["commodities"].unique().tolist())
+# Commodity filter (based on currently available data)
+available_commodities = sorted(exploded_df_filtered["commodity"].unique().tolist())
 selected_commodities = st.sidebar.multiselect(
-    "Filter by Commodity",
+    "Filter by Commodity Type",
     options=available_commodities,
-    default=available_commodities # Default to all
+    default=available_commodities # Default to All
 )
 
-# Apply commodity filter
 if selected_commodities:
-    df_filtered = df_filtered[df_filtered["commodities"].isin(selected_commodities)]
+    exploded_df_filtered = exploded_df_filtered[exploded_df_filtered["commodity"].isin(selected_commodities)]
 
-# Final check after filtering
-if df_filtered.empty:
-    st.warning("No data matches the selected filters. Please adjust the filters.")
+if raw_df_filtered.empty or exploded_df_filtered.empty:
+    st.warning("No data matches the current filter criteria. Please adjust your selections.")
     st.stop()
 
 # ==============================================================================
-# 6. TOP METRICS
+# 5. KEY PERFORMANCE INDICATORS (KPIs)
 # ==============================================================================
 
-st.header(f"Key Metrics (As of {today.strftime('%b %d, %Y')})")
-st.markdown("---")
+st.subheader(f"Current Period KPIs (Through {today.strftime('%b %d, %Y')})")
 
 col1, col2, col3, col4, col5 = st.columns(5)
 
-# Function to format amounts
-def format_amount(amount):
-    return f"{CURRENCY_SYMBOL}{amount:,.0f}"
+# Helper function for metric formatting
+def metric_format(value):
+    return f"{CURRENCY_CODE} {value:,.0f}"
 
 with col1:
-    st.metric("Transactions Today", count_between(raw_df, today, today))
-    st.metric("Amount Today", format_amount(sum_between(df, today, today)))
+    st.metric("Transactions Today", count_transactions(raw_df, today, today))
+    st.metric("Amount Today", metric_format(sum_between(raw_df, today, today)))
 
 with col2:
-    st.metric("Last 7 Days (Txn)", count_between(raw_df, last_7_days, today))
-    st.metric("Last 7 Days (Amount)", format_amount(sum_between(df, last_7_days, today)))
+    st.metric("Last 7-Day Count", count_transactions(raw_df, last_7_days_start, today))
+    st.metric("Last 7-Day Amount", metric_format(sum_between(raw_df, last_7_days_start, today)))
 
 with col3:
-    st.metric("This Week (Txn)", count_between(raw_df, start_of_week, today))
-    st.metric("This Week (Amount)", format_amount(sum_between(df, start_of_week, today)))
+    st.metric("Current Week Count", count_transactions(raw_df, start_of_week, today))
+    st.metric("Current Week Amount", metric_format(sum_between(raw_df, start_of_week, today)))
 
 with col4:
-    st.metric("This Month (Txn)", count_between(raw_df, start_of_month, today))
-    st.metric("This Month (Amount)", format_amount(sum_between(df, start_of_month, today)))
+    st.metric("Current Month Count", count_transactions(raw_df, start_of_month, today))
+    st.metric("Current Month Amount", metric_format(sum_between(raw_df, start_of_month, today)))
 
 with col5:
-    st.metric("This Year (Txn)", count_between(raw_df, start_of_year, today))
-    st.metric("This Year (Amount)", format_amount(sum_between(df, start_of_year, today)))
+    st.metric("YTD Count", count_transactions(raw_df, start_of_year, today))
+    st.metric("YTD Amount", metric_format(sum_between(raw_df, start_of_year, today)))
 
 st.markdown("---")
 
 # ==============================================================================
-# 7. DAILY SALES TREND (VISUALIZATION IMPROVEMENT)
+# 6. VISUALIZATION: SALES TREND
 # ==============================================================================
 
-st.header("📈 Daily Sales Trend")
+st.header("Sales Trend Analysis")
 
 daily_summary = (
-    df_filtered.groupby("date")["amount"]
-      .sum()
-      .reset_index()
-      .sort_values("date")
+    raw_df_filtered.groupby("date")["amount_pkr"]
+    .sum()
+    .reset_index()
+    .rename(columns={"amount_pkr": "Total_Sales"})
+    .sort_values("date")
 )
 
-# Use Altair for a more professional and interactive chart
-chart = alt.Chart(daily_summary).mark_line(point=True).encode(
-    x=alt.X("date", title="Date"),
-    y=alt.Y("amount", title=f"Total Amount ({CURRENCY_SYMBOL})"),
-    tooltip=[alt.Tooltip("date"), alt.Tooltip("amount", format=".2f")]
+# Altair Line Chart for professional look and interactivity
+chart_trend = alt.Chart(daily_summary).mark_line(point=True).encode(
+    x=alt.X("date:T", title="Date", axis=alt.Axis(format="%b %d, %Y")),
+    y=alt.Y("Total_Sales:Q", title=f"Total Sales ({CURRENCY_CODE})", axis=alt.Axis(format=CURRENCY_FORMAT)),
+    tooltip=[
+        alt.Tooltip("date:T", title="Date"),
+        alt.Tooltip("Total_Sales:Q", title="Amount", format=CURRENCY_FORMAT)
+    ]
 ).properties(
-    title=f"Sales Trend: {filter_start_date.strftime('%b %d, %Y')} to {filter_end_date.strftime('%b %d, %Y')}"
-).interactive() # Allows zooming and panning
+    title=f"Daily Sales Volume: {filter_start_date.strftime('%b %d, %Y')} to {filter_end_date.strftime('%b %d, %Y')}"
+).interactive() # Allows Zoom/Pan
 
-st.altair_chart(chart, use_container_width=True)
+st.altair_chart(chart_trend, use_container_width=True)
 
 st.markdown("---")
 
 # ==============================================================================
-# 8. SALES BY COMMODITY (VISUALIZATION IMPROVEMENT)
+# 7. VISUALIZATION: COMMODITY BREAKDOWN
 # ==============================================================================
 
-st.header("🌾 Sales by Commodity")
+st.header("Commodity Performance & Mix")
 
+# Commodity summary – uses the split amount
 commodity_summary = (
-    df_filtered.groupby("commodities")["amount"]
-      .sum()
-      .reset_index()
-      .sort_values("amount", ascending=False)
+    exploded_df_filtered.groupby("commodity")["amount_per_commodity"]
+    .sum()
+    .reset_index()
+    .rename(columns={"amount_per_commodity": "Amount"})
+    .sort_values("Amount", ascending=False)
 )
 
-# Display top N commodities with a slider filter
-top_n = st.slider("Show Top N Commodities", 5, len(commodity_summary), 10)
-top_commodity_summary = commodity_summary.head(top_n)
-
-col_chart, col_data = st.columns([2, 1])
+col_chart, col_table = st.columns([2, 1])
 
 with col_chart:
-    # Use Altair Bar Chart
-    bar_chart = alt.Chart(top_commodity_summary).mark_bar().encode(
-        x=alt.X("amount", title=f"Total Amount ({CURRENCY_SYMBOL})"),
-        y=alt.Y("commodities", sort="-x", title="Commodity"),
-        tooltip=["commodities", alt.Tooltip("amount", format=".0f")]
+    st.subheader("Top Selling Commodities (Volume)")
+    
+    top_n = st.slider("Select Top N Commodities to Display", 5, len(commodity_summary), 10, key="top_n_slider")
+    
+    top_commodity_summary = commodity_summary.head(top_n)
+
+    # Altair Bar Chart
+    chart_bar = alt.Chart(top_commodity_summary).mark_bar().encode(
+        x=alt.X("Amount:Q", title=f"Total Sales ({CURRENCY_CODE})", axis=alt.Axis(format=CURRENCY_FORMAT)),
+        y=alt.Y("commodity:N", sort="-x", title="Commodity"),
+        tooltip=[
+            alt.Tooltip("commodity:N", title="Commodity"),
+            alt.Tooltip("Amount:Q", title="Sales Amount", format=CURRENCY_FORMAT)
+        ]
     ).properties(
         title=f"Top {top_n} Commodities by Sales Amount"
     )
-    st.altair_chart(bar_chart, use_container_width=True)
+    st.altair_chart(chart_bar, use_container_width=True)
 
-with col_data:
-    # Use st.dataframe with formatting
+with col_table:
     st.subheader("Summary Table")
+    # Use pandas style to apply currency formatting
+    styled_df = commodity_summary.style.format({
+        "Amount": f"{CURRENCY_CODE} {{:,.0f}}",
+    })
+
     st.dataframe(
-        top_commodity_summary.style.format({"amount": f"{CURRENCY_SYMBOL} {{:,.0f}}"})
-            .set_caption(f"Top {top_n} Commodities"),
+        styled_df,
         use_container_width=True,
         hide_index=True
     )
@@ -279,28 +291,36 @@ with col_data:
 st.markdown("---")
 
 # ==============================================================================
-# 9. RAW DATA VIEWER
+# 8. DATA EXPLORER
 # ==============================================================================
 
-st.header("🔍 Filtered Data Explorer")
+st.header("Data Explorer: Transaction and Commodity Detail")
+st.caption(f"Showing data for period: {filter_start_date.strftime('%b %d, %Y')} to {filter_end_date.strftime('%b %d, %Y')}")
 
-# Allow users to choose which dataset to view
-data_choice = st.radio(
+# Select box for data view
+data_choice = st.selectbox(
     "Select Data View:",
-    options=["Exploded Data (Commodity Level)", "Raw Transaction Data (Initial Rows)"]
+    options=["Raw Transactions (Total Amount)", "Exploded Data (Commodity Level Amount)"]
 )
 
-if data_choice == "Exploded Data (Commodity Level)":
-    df_display = df_filtered.sort_values("date", ascending=False)
-    # Re-apply formatting for display
-    st.dataframe(
-        df_display.style.format({"amount": f"{CURRENCY_SYMBOL} {{:,.0f}}"}),
-        use_container_width=True
-    )
+if data_choice == "Raw Transactions (Total Amount)":
+    st.subheader("Raw Transaction Data")
+    # Prepare data for display
+    df_display = raw_df_filtered.sort_values("date", ascending=False).drop(columns=['phone'], errors='ignore')
+    
+    # Apply styling
+    styled_df = df_display.style.format({
+        "amount_pkr": f"{CURRENCY_CODE} {{:,.0f}}",
+    })
+    st.dataframe(styled_df, use_container_width=True)
+
 else:
-    # Filter the raw data just by date for display
-    raw_df_display = raw_df_filtered.sort_values("date", ascending=False)
-    st.dataframe(
-        raw_df_display.style.format({"amount": f"{CURRENCY_SYMBOL} {{:,.0f}}"}),
-        use_container_width=True
-    )
+    st.subheader("Exploded Commodity Data")
+    # Prepare data for display
+    df_display = exploded_df_filtered.sort_values(["date", "customer_name"], ascending=False).drop(columns=['amount_pkr'], errors='ignore')
+
+    # Apply styling
+    styled_df = df_display.style.format({
+        "amount_per_commodity": f"{CURRENCY_CODE} {{:,.0f}}",
+    })
+    st.dataframe(styled_df, use_container_width=True)
