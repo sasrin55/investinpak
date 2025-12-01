@@ -18,12 +18,19 @@ CURRENCY_FORMAT = "$,.0f"
 # --- CUSTOM THEME COLORS ---
 PAR_PRIMARY = "#006B3F"      # Dark Teal/Green (Buttons, Sliders, Highlights)
 PAR_BACKGROUND = "#F0F5F2"   # Light Gray/Green background
+PAR_TEXT = "#101010" # Dark text color
 
-# Configure the page layout (removed problematic theme args)
+# Configure the page layout and theme
 st.set_page_config(
     page_title="Zaraimandi Sales Dashboard",
     layout="wide",
     initial_sidebar_state="collapsed",
+    
+    primaryColor=PAR_PRIMARY,
+    backgroundColor=PAR_BACKGROUND,
+    secondaryBackgroundColor="#FFFFFF", 
+    textColor=PAR_TEXT,
+    font="sans serif"
 )
 
 # --- CSS Injection for Robust Theming ---
@@ -157,7 +164,7 @@ last_7_days_start = today - timedelta(days=6)
 
 ## 📊 Top-Level Filters
 st.subheader("Reporting Filters")
-filter_cols = st.columns([1, 2.5, 0.5])
+filter_cols = st.columns([1, 4])
 
 # 1. Date range selector
 with filter_cols[0]:
@@ -176,21 +183,9 @@ filter_end_date = max(date_range) if len(date_range) == 2 else date_range[0]
 raw_df_filtered = raw_df[(raw_df["date"] >= filter_start_date) & (raw_df["date"] <= filter_end_date)]
 exploded_df_filtered = exploded_df[(exploded_df["date"] >= filter_start_date) & (exploded_df["date"] <= filter_end_date)]
 
-# 2. Commodity filter
-with filter_cols[1]:
-    available_commodities = sorted(exploded_df_filtered["commodity"].unique().tolist())
-    selected_commodities = st.multiselect(
-        "Filter by Commodity Type",
-        options=available_commodities,
-        default=available_commodities,
-        key="top_commodity_filter"
-    )
-
-if selected_commodities:
-    exploded_df_filtered = exploded_df_filtered[exploded_df_filtered["commodity"].isin(selected_commodities)]
 
 if raw_df_filtered.empty or exploded_df_filtered.empty:
-    st.warning("No data matches the current filter criteria. Please adjust your selections.")
+    st.warning("No data matches the current date filter criteria. Please adjust your selections.")
     st.stop()
 
 st.markdown("---")
@@ -205,7 +200,33 @@ st.header("Key Performance Indicators (KPIs)")
 def metric_format(value):
     return f"{CURRENCY_CODE} {value:,.0f}"
 
-## KPI Section 1: Current Activity Snapshot
+## KPI Section 1: Top Transaction Count Summary Table
+st.subheader("Transaction Count Summary")
+
+txn_data = {
+    "Period": ["Transactions Today", "Transactions This Week", "Transactions This Month"],
+    "Count": [
+        count_transactions(raw_df, today, today),
+        count_transactions(raw_df, start_of_week, today),
+        count_transactions(raw_df, start_of_month, today)
+    ]
+}
+txn_df = pd.DataFrame(txn_data)
+
+# Transpose the DataFrame to get periods as columns
+txn_df_transposed = txn_df.set_index('Period').T 
+
+# Display using st.dataframe for a professional table look
+st.dataframe(
+    txn_df_transposed,
+    hide_index=True,
+    use_container_width=True
+)
+
+st.markdown("---")
+
+
+## KPI Section 2: Amount Metrics (Original format preserved)
 st.subheader("Current Activity Snapshot")
 kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
 
@@ -227,7 +248,7 @@ with kpi_col4:
 
 st.markdown("---")
 
-## KPI Section 2: Cumulative Performance
+## KPI Section 3: Cumulative Performance
 st.subheader("Cumulative Performance")
 kpi_col_ytd, _, _, _ = st.columns(4)
 
