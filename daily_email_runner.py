@@ -3,7 +3,7 @@
 import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+from email.mime_text import MIMEText
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
 
@@ -240,24 +240,32 @@ def build_daily_email_html(
 # -------------------------------------------------------------------
 
 def get_recipients_from_env() -> list:
-    """Read REPORT_RECIPIENT_EMAIL from env and turn into a clean list."""
+    """
+    Read REPORT_RECIPIENT_EMAIL from env and turn into a clean list.
+    Falls back to your three default emails if the env var is missing.
+    """
     raw = os.environ.get("REPORT_RECIPIENT_EMAIL", "")
-    # support comma or semicolon separated
+    if not raw.strip():
+        return [
+            "abdul.raafey@zaraimandi.com",
+            "ghasharib.shoukat@gmail.com",
+            "raahimshoukat99@gmail.com",
+        ]
     parts = [p.strip() for p in raw.replace(";", ",").split(",") if p.strip()]
     return parts
 
 
 def send_email_report(report_date: date) -> None:
     """Load data, build metrics, and send the email using GitHub Actions env vars."""
-    # From GitHub Actions env (bound from repo secrets)
-    smtp_user = os.environ["REPORT_SENDER_EMAIL"]
-    smtp_pass = os.environ["REPORT_SENDER_PASS"]
+    # These names match your workflow: SMTP_USER / SMTP_PASS / SMTP_SERVER / SMTP_PORT
+    smtp_user = os.environ["SMTP_USER"]
+    smtp_pass = os.environ["SMTP_PASS"]
     smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
     smtp_port = int(os.environ.get("SMTP_PORT", "465"))
 
     recipients = get_recipients_from_env()
     if not recipients:
-        raise RuntimeError("No recipients found in REPORT_RECIPIENT_EMAIL.")
+        raise RuntimeError("No recipients found in REPORT_RECIPIENT_EMAIL or fallback list.")
 
     # Load data
     raw_df = load_data(use_cache=False)
