@@ -7,6 +7,8 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from zoneinfo import ZoneInfo
+from analytics_service import get_dashboard_data   # NEW
+print("TEST:", get_dashboard_data(date.today()))   # NEW
 
 from report_utils import (
     load_data,
