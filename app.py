@@ -21,16 +21,15 @@ st.markdown("Transaction and Commodity-level Sales Intelligence.")
 st.markdown("---")
 
 # ==============================================================================
-# 1. EMAIL HELPER FUNCTION DEFINITIONS (MOVED TO TOP)
+# 1. EMAIL HELPER FUNCTION DEFINITIONS (FIXED AND MOVED TO TOP)
 # ==============================================================================
-
-# These functions must be defined early so the UI button can call them later.
 
 def build_daily_email_html(report_date: date, metrics: dict):
     """Builds a simple HTML email for a given date using KPI data."""
     
     rows_html = ""
     # Get the top 5 commodities table data from the calculated metrics
+    # Using the DataFrame returned by get_kpi_metrics
     df = metrics["df"].groupby("commodity")["gross_amount_per_commodity"].sum().reset_index().sort_values("gross_amount_per_commodity", ascending=False).head(5)
     
     for _, row in df.iterrows():
@@ -69,6 +68,11 @@ def build_daily_email_html(report_date: date, metrics: dict):
     """
     return html
 
+# @st.cache_data wrapper around load_data is needed inside the app context
+@st.cache_data(show_spinner="Connecting to Google Sheet and loading...")
+def cached_load_data():
+    return load_data(use_cache=False) # Delegate loading to report_utils
+
 def send_email_report(recipient_emails: list, report_date: date):
     """Send the HTML report email to multiple recipients using st.secrets."""
     try:
@@ -80,8 +84,7 @@ def send_email_report(recipient_emails: list, report_date: date):
         st.error(f"SMTP credentials not found in st.secrets. Please configure SMTP_USER / SMTP_PASS. Details: {e}")
         return False
 
-    # FIX: Ensure data is loaded locally within this context if not global yet
-    # Use cached_load_data() locally here
+    # FIX: Ensure raw_df_local and exploded_df_local are available for get_kpi_metrics
     try:
         raw_df_local = cached_load_data()
         exploded_df_local = explode_commodities(raw_df_local)
@@ -110,13 +113,8 @@ def send_email_report(recipient_emails: list, report_date: date):
 
 
 # ==============================================================================
-# 2. DATA LOADING AND PRE-CALCULATIONS 
+# 2. DATA LOADING AND PRE-CALCULATIONS (Standard App Loading)
 # ==============================================================================
-
-# Custom load_data wrapper to use st.cache_data
-@st.cache_data(show_spinner="Connecting to Google Sheet and loading...")
-def cached_load_data():
-    return load_data(use_cache=False) # Delegate loading to report_utils
 
 raw_df = cached_load_data()
 exploded_df = explode_commodities(raw_df)
@@ -147,7 +145,6 @@ if min_data_date > max_data_date: min_data_date = max_data_date
 st.subheader("Reporting Filters")
 filter_cols = st.columns([1, 4])
 with filter_cols[0]:
-    # CRASH FIX: Uses safe_min_date/safe_max_date for boundaries
     date_range = st.date_input(
         "Reporting Period", value=(min_data_date, today), 
         min_value=safe_min_date, max_value=safe_max_date, key="top_date_filter"
@@ -194,7 +191,6 @@ if send_now:
             # Fallback if zoneinfo is not perfectly configured
             today_pk = datetime.now().date() 
 
-        # FIX: The function is now defined above and can be called directly
         success = send_email_report([recipient_email], today_pk) 
         if success:
             st.success(f"Report sent to {recipient_email}")
@@ -271,7 +267,7 @@ txn_count_by_customer_commodity["Buyer Type"] = np.where(
 loyalty_summary = (
     exploded_df.merge(txn_count_by_customer_commodity, on='customer_name', how='left')
     .groupby(["commodity", "Buyer Type"])
-    ["customer_name"].nunique() # Count unique customers in each type
+    ["customer_name"].nunique()
     .unstack(fill_value=0)
 )
 
