@@ -167,7 +167,7 @@ st.markdown("---")
 
 st.header("Email Report (On-Demand Sender)")
 
-st.caption("Enter a single email address and send today's summary report.")
+st.caption("Enter a single email address to securely send today's summary report.")
 
 col_email_input, col_email_button = st.columns([3, 1])
 
