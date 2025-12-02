@@ -300,7 +300,7 @@ def create_summary_table_vertical(df, period_title, transactions_count):
 # --- RENDER ALL KPI SECTIONS VERTICALLY ---
 
 # 1. TODAY'S SALES
-st.markdown("## 📅 Today's Sales Performance")
+st.markdown("## Today's Sales Performance")
 today_sales_date = today 
 today_metrics = get_kpi_metrics(today_sales_date, today_sales_date)
 
@@ -323,7 +323,7 @@ st.markdown("---")
 
 
 # 2. LAST 7 DAYS
-st.markdown("## 📈 Last 7 Days Performance")
+st.markdown("## Last 7 Days Performance")
 last_7_metrics = get_kpi_metrics(last_7_days_start, today)
 
 col_7_1, col_7_2, col_7_3, col_7_4 = st.columns(4)
@@ -345,7 +345,7 @@ st.markdown("---")
 
 
 # 3. LAST 30 DAYS
-st.markdown("## 🗓️ Last 30 Days Performance")
+st.markdown("## Last 30 Days Performance")
 last_30_metrics = get_kpi_metrics(last_30_days_start, today)
 
 col_30_1, col_30_2, col_30_3, col_30_4 = st.columns(4)
@@ -367,7 +367,7 @@ st.markdown("---")
 
 
 # 4. YEAR-TO-DATE
-st.markdown("## 💰 Year-to-Date (YTD) Performance")
+st.markdown("## Year-to-Date (YTD) Performance")
 ytd_metrics = get_kpi_metrics(start_of_year, today)
 
 col_ytd_1, col_ytd_2, col_ytd_3, col_ytd_4 = st.columns(4)
