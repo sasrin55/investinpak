@@ -324,14 +324,16 @@ st.markdown("Analyzes commodity performance based on the count of unique **New**
 txn_count_by_customer_commodity = (
     exploded_df.groupby(["customer_name", "commodity"])["date"].nunique().reset_index()
 )
-txn_count_by_customer_commodity.rename(columns={"date": "Total Transactions"}, inplace=True)
+# CORRECTED RENAME: The column used for the count must be named correctly.
+txn_count_by_customer_commodity.rename(columns={"date": "Total Transactions"}, inplace=True) 
 
 # 2. Determine Buyer Type (New vs. Repeat) for each customer-commodity pair
 # A buyer is 'Repeat' if their Transaction Count for that commodity > 1.
 # A buyer is 'New' if their Transaction Count for that commodity == 1.
 
 txn_count_by_customer_commodity["Buyer Type"] = np.where(
-    txn_count_by_customer_commodity["Transaction Count"] > 1, 
+    # FIXED: Using the correctly renamed column name "Total Transactions"
+    txn_count_by_customer_commodity["Total Transactions"] > 1, 
     "Repeat", 
     "New"
 )
