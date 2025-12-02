@@ -4,7 +4,8 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
-from report_utils import load_data, explode_commodities, get_kpi_metrics, metric_format, CURRENCY_CODE
+# FIX: Import CURRENCY_FORMAT from report_utils
+from report_utils import load_data, explode_commodities, get_kpi_metrics, metric_format, CURRENCY_CODE, CURRENCY_FORMAT
 
 # --- HARDCODED RECIPIENTS ---
 # The fixed list of recipients you provided
@@ -63,9 +64,10 @@ def run_and_send_report(report_date: date):
         raw_df = load_data()
         exploded_df = explode_commodities(raw_df)
         
-        # Calculate TODAY's metrics (using current server time for simplicity)
+        # Calculate TODAY's metrics 
         metrics = get_kpi_metrics(raw_df, exploded_df, report_date, report_date)
         
+        # SMTP credentials pulled from GitHub Actions environment secrets
         smtp_user = os.environ["REPORT_SENDER_EMAIL"]
         smtp_pass = os.environ["REPORT_SENDER_PASS"]
         smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
@@ -88,7 +90,6 @@ def run_and_send_report(report_date: date):
 
     except Exception as e:
         print(f"FATAL ERROR during report run for {report_date}: {e}")
-        # Optionally send a notification email here if the main email failed
 
 if __name__ == "__main__":
     # Get the current date in Pakistan time (Asia/Karachi)
