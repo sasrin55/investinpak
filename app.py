@@ -24,12 +24,12 @@ from report_utils import (
 # PAGE CONFIG 
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Zarai Mandi Sales Dashboard", # CORRECTED SPELLING HERE
+    page_title="Zarai Mandi Sales Dashboard",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-st.title("💰 Zarai Mandi Sales Dashboard") # CORRECTED SPELLING HERE
+st.title("Zarai Mandi Sales Dashboard")
 st.markdown("**Transaction and Commodity-level Sales Intelligence.**")
 st.markdown("---")
 
@@ -213,7 +213,8 @@ def build_daily_email_html(
     html = f"""
     <html>
     <body style="font-family:Arial, sans-serif; font-size:14px;">
-        <h2>Zarai Mandi Daily Report – {report_date}</h2> <p>This report summarizes the day's gross sales activity with context vs recent performance.</p>
+        <h2>Zarai Mandi Daily Report – {report_date}</h2>
+        <p>This report summarizes the day's gross sales activity with context vs recent performance.</p>
 
         <ul>
             <li><b>Total sales:</b> {metric_format(today_metrics["total_amount"])}</li>
@@ -301,7 +302,7 @@ def send_email_report(recipient_emails: List[str], report_date: date) -> bool:
     )
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"[V2] Zarai Mandi Daily Sales Report – {report_date}" # CORRECTED SPELLING HERE
+    msg["Subject"] = f"[V2] Zarai Mandi Daily Sales Report – {report_date}"
     msg["From"] = smtp_user
     msg["To"] = ", ".join(recipient_emails)
     msg.attach(MIMEText(html_body, "html"))
@@ -439,7 +440,7 @@ st.markdown("---")
 # EMAIL SECTION (ON DEMAND)
 # -----------------------------------------------------------------------------
 
-st.header("✉️ Email Report (On-Demand Sender)")
+st.header("Email Report (On-Demand Sender)")
 st.caption("Enter a single email address and send today's summary report.")
 
 col_email_input, col_email_button = st.columns([3, 1])
@@ -471,7 +472,7 @@ st.markdown("---")
 # KPI BLOCKS (REFACTORED FOR COMPARISON)
 # -----------------------------------------------------------------------------
 
-st.header("📈 Last 30 Days Performance")
+st.header("Last 30 Days Performance")
 
 # 1. Calculate the metrics for the current period (Last 30 Days)
 current_metrics = get_kpi_metrics(raw_df, exploded_df, last_30_days_start, today)
@@ -519,10 +520,21 @@ with col4:
         delta_label="vs Prior 30 Days",
     )
 with col5:
+    top_commodity_amount = current_metrics['top_commodity_amount']
+    top_commodity_name = current_metrics['top_commodity_name']
+    
+    # NEW LOGIC: Check if the amount is valid before formatting (Fixes the ValueError)
+    if top_commodity_amount and top_commodity_amount > 0:
+        sub_value = f"({metric_format(top_commodity_amount)})"
+    else:
+        # Display a clear message if there are no sales in the period
+        sub_value = "(No sales this period)"
+        top_commodity_name = "N/A"
+        
     st.metric(
         "Top Commodity",
-        current_metrics['top_commodity_name'],
-        f"({metric_format(current_metrics['top_commodity_amount'])})",
+        top_commodity_name,
+        sub_value,
     )
 
 st.markdown("---")
@@ -565,7 +577,7 @@ st.markdown("---")
 # COMMODITY PERFORMANCE (Visualized)
 # -----------------------------------------------------------------------------
 
-st.header("📊 Top Commodity Performance & Mix")
+st.header("Top Commodity Performance & Mix")
 col_chart, col_table = st.columns([2, 1])
 
 # --- Chart Column (Visual Breakdown) ---
@@ -633,7 +645,7 @@ st.markdown("---")
 # LOYALTY, SEASONALITY, DATA EXPLORER
 # -----------------------------------------------------------------------------
 
-st.header("👥 Commodity Loyalty Analysis")
+st.header("Commodity Loyalty Analysis")
 st.markdown(
     "Analyzes commodity performance based on the count of unique **New** vs. **Repeat** buyers across the entire dataset."
 )
@@ -677,7 +689,7 @@ else:
     st.info("No sales data available to analyze buyer loyalty.")
 st.markdown("---")
 
-st.header("🗓️ Commodity Seasonality Analysis")
+st.header("Commodity Seasonality Analysis")
 st.markdown("Sales trend by month to identify peak selling seasons for each commodity.")
 
 seasonality_df = exploded_df.copy()
@@ -739,7 +751,7 @@ else:
     )
 st.markdown("---")
 
-st.header("🔍 Data Explorer: Transaction and Commodity Detail")
+st.header("Data Explorer: Transaction and Commodity Detail")
 st.caption(
     f"Showing data for period: {filter_start_date.strftime('%b %d, %Y')} to {filter_end_date.strftime('%b %d, %Y')}"
 )
