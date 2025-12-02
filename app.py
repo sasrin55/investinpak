@@ -10,164 +10,21 @@ from email.mime.text import MIMEText
 from zoneinfo import ZoneInfo
 from report_utils import load_data, explode_commodities, get_kpi_metrics, metric_format, count_transactions, sum_between, CURRENCY_CODE, CURRENCY_FORMAT
 
-# --- SETTINGS ---
-# Sheet ID and URL are now handled in report_utils.py
-
-# Configure the page layout (Standard, stable arguments)
+# --- TITLE AND CONFIGURATION (remains at the very top) ---
 st.set_page_config(
     page_title="Zaraimandi Sales Dashboard",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-
-# --- Title and Header ---
 st.title("Zaraimandi Sales Dashboard")
 st.markdown("Transaction and Commodity-level Sales Intelligence.")
 st.markdown("---")
 
-
 # ==============================================================================
-# 2. DATA LOADING AND PRE-CALCULATIONS (Using functions from report_utils)
-# ==============================================================================
-
-# Custom load_data wrapper to use st.cache_data
-@st.cache_data(show_spinner="Connecting to Google Sheet and loading...")
-def cached_load_data():
-    return load_data(use_cache=False) # Delegate loading to report_utils
-
-raw_df = cached_load_data()
-exploded_df = explode_commodities(raw_df)
-
-if raw_df.empty:
-    st.stop()
-
-# Date Calculations
-today = date.today()
-start_of_year = date(today.year, 1, 1)
-last_30_days_start = today - timedelta(days=29)
-last_7_days_start = today - timedelta(days=6)
-
-
-# --- Date Handling and Filters (CRASH FIX SECTION) ---
-safe_min_date = date(2020, 1, 1) # CRASH FIX: Safe boundary
-safe_max_date = today 
-raw_min = raw_df["date"].min()
-raw_max = raw_df["date"].max()
-min_data_date = raw_min if pd.notna(raw_min) else start_of_year
-max_data_date = raw_max if pd.notna(raw_max) else today
-
-if isinstance(min_data_date, pd.Timestamp): min_data_date = min_data_date.date()
-if isinstance(max_data_date, pd.Timestamp): max_data_date = max_data_date.date()
-
-if min_data_date > max_data_date: min_data_date = max_data_date
-
-st.subheader("Reporting Filters")
-filter_cols = st.columns([1, 4])
-with filter_cols[0]:
-    # CRASH FIX: Uses safe_min_date/safe_max_date for boundaries
-    date_range = st.date_input(
-        "Reporting Period", value=(min_data_date, today), 
-        min_value=safe_min_date, max_value=safe_max_date, key="top_date_filter"
-    )
-
-filter_start_date = min(date_range)
-filter_end_date = max(date_range) if len(date_range) == 2 else date_range[0]
-
-raw_df_filtered = raw_df[(raw_df["date"] >= filter_start_date) & (raw_df["date"] <= filter_end_date)]
-exploded_df_filtered = exploded_df[(exploded_df["date"] >= filter_start_date) & (exploded_df["date"] <= filter_end_date)]
-
-if raw_df_filtered.empty or exploded_df_filtered.empty:
-    st.warning("No data matches the current date filter criteria. Please adjust your selections.")
-    st.stop()
-
-st.markdown("---")
-
-
-# ==============================================================================
-# 9. EMAIL REPORT FROM DASHBOARD UI (ON-DEMAND BUTTON) - MOVED TO TOP
+# 1. EMAIL HELPER FUNCTION DEFINITIONS (MOVED TO TOP)
 # ==============================================================================
 
-st.header("Email Report (On-Demand Sender)")
-
-st.caption("Enter a single email address to securely send today's summary report.")
-
-col_email_input, col_email_button = st.columns([3, 1])
-
-with col_email_input:
-    recipient_email = st.text_input("Recipient email", placeholder="someone@example.com")
-
-with col_email_button:
-    st.write("")
-    st.write("")
-    send_now = st.button("Send Today's Report Now")
-
-if send_now:
-    if not recipient_email:
-        st.warning("Please enter an email address first.")
-    else:
-        # Use Pakistan time for choosing 'today' if you care about date rollover
-        try:
-            today_pk = datetime.now(ZoneInfo("Asia/Karachi")).date()
-        except Exception:
-            # Fallback if zoneinfo is not perfectly configured
-            today_pk = datetime.now().date() 
-
-        # Note: send_email_report is defined in Section 5, but called here
-        success = send_email_report([recipient_email], today_pk)
-        if success:
-            st.success(f"Report sent to {recipient_email}")
-
-st.markdown("---")
-# ==============================================================================
-# 4. KEY PERFORMANCE INDICATORS (KPIs) - VERTICAL SECTIONS (Original Section 4)
-# ==============================================================================
-
-st.header("Key Performance Indicators (KPIs) - Gross Sales")
-
-def create_summary_table_vertical(df, period_title, transactions_count):
-    """Generates the detailed table for the vertical sections."""
-    AMOUNT_COL_NAME = f"Amount ({CURRENCY_CODE})"
-    summary_df = df.groupby(["customer_name", "commodity"])["gross_amount_per_commodity"].sum().reset_index()
-    summary_df = summary_df.rename(columns={"customer_name": "Customer", "commodity": "Commodity", "gross_amount_per_commodity": AMOUNT_COL_NAME})
-    summary_df = summary_df.sort_values(AMOUNT_COL_NAME, ascending=False)
-    styled_df = summary_df.style.format({AMOUNT_COL_NAME: f"{CURRENCY_CODE} {{:,.0f}}",})
-    
-    st.subheader(f"Detailed Breakdown (Total Transactions: {transactions_count})")
-    with st.container(border=True):
-        st.dataframe(styled_df, use_container_width=True, hide_index=True, height=500)
-
-
-# --- RENDER ALL KPI SECTIONS VERTICALLY ---
-
-def render_kpi_block(title, start_date, end_date):
-    st.markdown(f"## {title}")
-    # Pass raw_df and exploded_df to the utility function
-    metrics = get_kpi_metrics(raw_df, exploded_df, start_date, end_date) 
-
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("**Total Sales**", metric_format(metrics["total_amount"]))
-    with col2:
-        st.metric("**Total Transactions**", metrics["total_transactions"])
-    with col3:
-        st.metric("**Unique Customers**", metrics["unique_customers"])
-    with col4:
-        st.metric("**Top Commodity**", f"{metrics['top_commodity_name']} ({metrics['top_commodity_amount']})")
-
-    create_summary_table_vertical(
-        metrics["df"], title, metrics["total_transactions"]
-    )
-    st.markdown("---")
-    return metrics 
-
-render_kpi_block("Today's Sales Performance", today, today)
-render_kpi_block("Last 7 Days Performance", last_7_days_start, today)
-render_kpi_block("Last 30 Days Performance", last_30_days_start, today)
-render_kpi_block("Year-to-Date (YTD) Performance", start_of_year, today)
-
-# ==============================================================================
-# 5. EMAIL HELPERS (For On-Demand Button) - Original Section 5
-# ==============================================================================
+# These functions must be defined early so the UI button can call them later.
 
 def build_daily_email_html(report_date: date, metrics: dict):
     """Builds a simple HTML email for a given date using KPI data."""
@@ -224,8 +81,16 @@ def send_email_report(recipient_emails: list, report_date: date):
         return False
 
     # Calculate TODAY's metrics (using cached data)
-    metrics = get_kpi_metrics(raw_df, exploded_df, report_date, report_date)
-    
+    # We must reload data here because get_kpi_metrics needs raw_df and exploded_df
+    # which are only loaded in the main script block below.
+    try:
+        raw_df_local = cached_load_data()
+        exploded_df_local = explode_commodities(raw_df_local)
+        metrics = get_kpi_metrics(raw_df_local, exploded_df_local, report_date, report_date)
+    except Exception as e:
+        st.error(f"Error calculating metrics for email report: {e}")
+        return False
+
     html_body = build_daily_email_html(report_date, metrics)
 
     msg = MIMEMultipart("alternative")
@@ -243,6 +108,146 @@ def send_email_report(recipient_emails: list, report_date: date):
     except Exception as e:
         st.error(f"Error sending email: {e}")
         return False
+
+
+# ==============================================================================
+# 2. DATA LOADING AND PRE-CALCULATIONS (Original Section 2)
+# ==============================================================================
+
+# Custom load_data wrapper to use st.cache_data
+@st.cache_data(show_spinner="Connecting to Google Sheet and loading...")
+def cached_load_data():
+    return load_data(use_cache=False) # Delegate loading to report_utils
+
+raw_df = cached_load_data()
+exploded_df = explode_commodities(raw_df)
+
+if raw_df.empty:
+    st.stop()
+
+# Date Calculations
+today = date.today()
+start_of_year = date(today.year, 1, 1)
+last_30_days_start = today - timedelta(days=29)
+last_7_days_start = today - timedelta(days=6)
+
+
+# --- Date Handling and Filters (CRASH FIX SECTION) ---
+safe_min_date = date(2020, 1, 1) 
+safe_max_date = today 
+raw_min = raw_df["date"].min()
+raw_max = raw_df["date"].max()
+min_data_date = raw_min if pd.notna(raw_min) else start_of_year
+max_data_date = raw_max if pd.notna(raw_max) else today
+
+if isinstance(min_data_date, pd.Timestamp): min_data_date = min_data_date.date()
+if isinstance(max_data_date, pd.Timestamp): max_data_date = max_data_date.date()
+
+if min_data_date > max_data_date: min_data_date = max_data_date
+
+st.subheader("Reporting Filters")
+filter_cols = st.columns([1, 4])
+with filter_cols[0]:
+    date_range = st.date_input(
+        "Reporting Period", value=(min_data_date, today), 
+        min_value=safe_min_date, max_value=safe_max_date, key="top_date_filter"
+    )
+
+filter_start_date = min(date_range)
+filter_end_date = max(date_range) if len(date_range) == 2 else date_range[0]
+
+raw_df_filtered = raw_df[(raw_df["date"] >= filter_start_date) & (raw_df["date"] <= filter_end_date)]
+exploded_df_filtered = exploded_df[(exploded_df["date"] >= filter_start_date) & (exploded_df["date"] <= filter_end_date)]
+
+if raw_df_filtered.empty or exploded_df_filtered.empty:
+    st.warning("No data matches the current date filter criteria. Please adjust your selections.")
+    st.stop()
+
+st.markdown("---")
+
+# ==============================================================================
+# 9. EMAIL REPORT FROM DASHBOARD UI (ON-DEMAND BUTTON) - MOVED TO TOP
+# ==============================================================================
+
+st.header("Email Report (On-Demand Sender)")
+
+st.caption("Enter a single email address to securely send today's summary report.")
+
+col_email_input, col_email_button = st.columns([3, 1])
+
+with col_email_input:
+    recipient_email = st.text_input("Recipient email", placeholder="someone@example.com")
+
+with col_email_button:
+    st.write("")
+    st.write("")
+    send_now = st.button("Send Today's Report Now")
+
+if send_now:
+    if not recipient_email:
+        st.warning("Please enter an email address first.")
+    else:
+        # Use Pakistan time for choosing 'today' if you care about date rollover
+        try:
+            today_pk = datetime.now(ZoneInfo("Asia/Karachi")).date()
+        except Exception:
+            # Fallback if zoneinfo is not perfectly configured
+            today_pk = datetime.now().date() 
+
+        # FIX: The function is now defined above and can be called directly
+        success = send_email_report([recipient_email], today_pk) 
+        if success:
+            st.success(f"Report sent to {recipient_email}")
+
+st.markdown("---")
+
+
+# ==============================================================================
+# 4. KEY PERFORMANCE INDICATORS (KPIs) - VERTICAL SECTIONS (Original Section 4)
+# ==============================================================================
+
+st.header("Key Performance Indicators (KPIs) - Gross Sales")
+
+def create_summary_table_vertical(df, period_title, transactions_count):
+    """Generates the detailed table for the vertical sections."""
+    AMOUNT_COL_NAME = f"Amount ({CURRENCY_CODE})"
+    summary_df = df.groupby(["customer_name", "commodity"])["gross_amount_per_commodity"].sum().reset_index()
+    summary_df = summary_df.rename(columns={"customer_name": "Customer", "commodity": "Commodity", "gross_amount_per_commodity": AMOUNT_COL_NAME})
+    summary_df = summary_df.sort_values(AMOUNT_COL_NAME, ascending=False)
+    styled_df = summary_df.style.format({AMOUNT_COL_NAME: f"{CURRENCY_CODE} {{:,.0f}}",})
+    
+    st.subheader(f"Detailed Breakdown (Total Transactions: {transactions_count})")
+    with st.container(border=True):
+        st.dataframe(styled_df, use_container_width=True, hide_index=True, height=500)
+
+
+# --- RENDER ALL KPI SECTIONS VERTICALLY ---
+
+def render_kpi_block(title, start_date, end_date):
+    st.markdown(f"## {title}")
+    # Pass raw_df and exploded_df to the utility function
+    metrics = get_kpi_metrics(raw_df, exploded_df, start_date, end_date) 
+
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("**Total Sales**", metric_format(metrics["total_amount"]))
+    with col2:
+        st.metric("**Total Transactions**", metrics["total_transactions"])
+    with col3:
+        st.metric("**Unique Customers**", metrics["unique_customers"])
+    with col4:
+        st.metric("**Top Commodity**", f"{metrics['top_commodity_name']} ({metrics['top_commodity_amount']})")
+
+    create_summary_table_vertical(
+        metrics["df"], title, metrics["total_transactions"]
+    )
+    st.markdown("---")
+    return metrics 
+
+render_kpi_block("Today's Sales Performance", today, today)
+render_kpi_block("Last 7 Days Performance", last_7_days_start, today)
+render_kpi_block("Last 30 Days Performance", last_30_days_start, today)
+render_kpi_block("Year-to-Date (YTD) Performance", start_of_year, today)
 
 # ==============================================================================
 # 10. LOYALTY, SEASONALITY, DATA EXPLORER (Original Sections 5-8)
