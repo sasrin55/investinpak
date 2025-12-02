@@ -8,7 +8,8 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from zoneinfo import ZoneInfo
-from report_utils import load_data, explode_commodities, get_kpi_metrics, metric_format, count_transactions, sum_between, CURRENCY_CODE
+# FIX: Import CURRENCY_FORMAT from report_utils
+from report_utils import load_data, explode_commodities, get_kpi_metrics, metric_format, count_transactions, sum_between, CURRENCY_CODE, CURRENCY_FORMAT
 
 # --- SETTINGS ---
 # Sheet ID and URL are now handled in report_utils.py
@@ -48,7 +49,7 @@ last_30_days_start = today - timedelta(days=29)
 last_7_days_start = today - timedelta(days=6)
 
 
-# --- Date Handling and Filters ---
+# --- Date Handling and Filters (CRASH FIX SECTION) ---
 safe_min_date = date(2020, 1, 1) # CRASH FIX: Safe boundary
 safe_max_date = today 
 raw_min = raw_df["date"].min()
