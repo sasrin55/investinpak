@@ -18,16 +18,12 @@ from report_utils import (
     CURRENCY_CODE,
 )
 
-# Recipients for the automatic 5pm PKT report
-RECIPIENT_EMAILS = [
-    "abdul.raafey@zaraimandi.com",
-    "ghasharib.shoukat@gmail.com",
-    "raahimshoukat99@gmail.com",
-]
-
+# -------------------------------------------------------------------
+# HELPERS FOR COMPARISONS & RANK MOVEMENT
+# -------------------------------------------------------------------
 
 def get_commodity_comparisons(exploded_df: pd.DataFrame, report_date: date) -> pd.DataFrame:
-    """WoW and MoM % for top commodities (same logic as app)."""
+    """WoW and MoM % for top commodities (same logic as dashboard)."""
     current_7_start = report_date - timedelta(days=6)
     previous_7_start = report_date - timedelta(days=13)
     current_30_start = report_date - timedelta(days=29)
@@ -100,7 +96,7 @@ def calculate_rank_movement(exploded_df: pd.DataFrame, report_date: date) -> pd.
         axis=1,
     )
 
-    # if no baseline, use current rank so movement starts at 0
+    # If no baseline, use current rank so movement starts at 0
     rank_comparison["Baseline Rank"] = rank_comparison["Baseline Rank"].fillna(
         rank_comparison["Current Rank"]
     )
@@ -136,6 +132,9 @@ def calculate_rank_movement(exploded_df: pd.DataFrame, report_date: date) -> pd.
 
     return final_df[["commodity", "Amount", "Current Rank", "Rank Change"]]
 
+# -------------------------------------------------------------------
+# EMAIL HTML
+# -------------------------------------------------------------------
 
 def build_daily_email_html(
     report_date: date,
@@ -236,17 +235,35 @@ def build_daily_email_html(
     """
     return html
 
+# -------------------------------------------------------------------
+# SENDING LOGIC
+# -------------------------------------------------------------------
+
+def get_recipients_from_env() -> list:
+    """Read REPORT_RECIPIENT_EMAIL from env and turn into a clean list."""
+    raw = os.environ.get("REPORT_RECIPIENT_EMAIL", "")
+    # support comma or semicolon separated
+    parts = [p.strip() for p in raw.replace(";", ",").split(",") if p.strip()]
+    return parts
+
 
 def send_email_report(report_date: date) -> None:
-    """Load data, build metrics, and send the email using SMTP env vars."""
-    smtp_user = os.environ["SMTP_USER"]
-    smtp_pass = os.environ["SMTP_PASS"]
+    """Load data, build metrics, and send the email using GitHub Actions env vars."""
+    # From GitHub Actions env (bound from repo secrets)
+    smtp_user = os.environ["REPORT_SENDER_EMAIL"]
+    smtp_pass = os.environ["REPORT_SENDER_PASS"]
     smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
     smtp_port = int(os.environ.get("SMTP_PORT", "465"))
 
+    recipients = get_recipients_from_env()
+    if not recipients:
+        raise RuntimeError("No recipients found in REPORT_RECIPIENT_EMAIL.")
+
+    # Load data
     raw_df = load_data(use_cache=False)
     exploded_df = explode_commodities(raw_df)
 
+    # Metrics
     today_metrics = get_kpi_metrics(raw_df, exploded_df, report_date, report_date)
     last_7_metrics = get_kpi_metrics(
         raw_df, exploded_df, report_date - timedelta(days=6), report_date
@@ -262,19 +279,20 @@ def send_email_report(report_date: date) -> None:
         report_date, today_metrics, last_7_metrics, ytd_metrics, trend_df, rank_df
     )
 
+    # Compose and send
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"Zaraimandi Daily Sales Report – {report_date}"
     msg["From"] = smtp_user
-    msg["To"] = ", ".join(RECIPIENT_EMAILS)
+    msg["To"] = ", ".join(recipients)
     msg.attach(MIMEText(html_body, "html"))
 
     with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
         server.login(smtp_user, smtp_pass)
-        server.sendmail(smtp_user, RECIPIENT_EMAILS, msg.as_string())
+        server.sendmail(smtp_user, recipients, msg.as_string())
 
 
 def main():
-    # Use Pakistan time for the date
+    # Use Pakistan time for the report date
     report_date = datetime.now(ZoneInfo("Asia/Karachi")).date()
     send_email_report(report_date)
 
