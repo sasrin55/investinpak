@@ -8,7 +8,6 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from zoneinfo import ZoneInfo
-# FIX: Import CURRENCY_FORMAT from report_utils
 from report_utils import load_data, explode_commodities, get_kpi_metrics, metric_format, count_transactions, sum_between, CURRENCY_CODE, CURRENCY_FORMAT
 
 # --- SETTINGS ---
@@ -83,8 +82,44 @@ if raw_df_filtered.empty or exploded_df_filtered.empty:
 
 st.markdown("---")
 
+
 # ==============================================================================
-# 4. KEY PERFORMANCE INDICATORS (KPIs) - VERTICAL SECTIONS
+# 9. EMAIL REPORT FROM DASHBOARD UI (ON-DEMAND BUTTON) - MOVED TO TOP
+# ==============================================================================
+
+st.header("Email Report (On-Demand Sender)")
+
+st.caption("Enter a single email address to securely send today's summary report.")
+
+col_email_input, col_email_button = st.columns([3, 1])
+
+with col_email_input:
+    recipient_email = st.text_input("Recipient email", placeholder="someone@example.com")
+
+with col_email_button:
+    st.write("")
+    st.write("")
+    send_now = st.button("Send Today's Report Now")
+
+if send_now:
+    if not recipient_email:
+        st.warning("Please enter an email address first.")
+    else:
+        # Use Pakistan time for choosing 'today' if you care about date rollover
+        try:
+            today_pk = datetime.now(ZoneInfo("Asia/Karachi")).date()
+        except Exception:
+            # Fallback if zoneinfo is not perfectly configured
+            today_pk = datetime.now().date() 
+
+        # Note: send_email_report is defined in Section 5, but called here
+        success = send_email_report([recipient_email], today_pk)
+        if success:
+            st.success(f"Report sent to {recipient_email}")
+
+st.markdown("---")
+# ==============================================================================
+# 4. KEY PERFORMANCE INDICATORS (KPIs) - VERTICAL SECTIONS (Original Section 4)
 # ==============================================================================
 
 st.header("Key Performance Indicators (KPIs) - Gross Sales")
@@ -131,7 +166,7 @@ render_kpi_block("Last 30 Days Performance", last_30_days_start, today)
 render_kpi_block("Year-to-Date (YTD) Performance", start_of_year, today)
 
 # ==============================================================================
-# 5. EMAIL HELPERS (For On-Demand Button)
+# 5. EMAIL HELPERS (For On-Demand Button) - Original Section 5
 # ==============================================================================
 
 def build_daily_email_html(report_date: date, metrics: dict):
@@ -209,42 +244,8 @@ def send_email_report(recipient_emails: list, report_date: date):
         st.error(f"Error sending email: {e}")
         return False
 
-# ------------------------------------------------------------------
-# 9. EMAIL REPORT FROM DASHBOARD UI (ON-DEMAND BUTTON)
-# ------------------------------------------------------------------
-
-st.markdown("---")
-st.header("Email this report (On-Demand)")
-
-st.caption("Enter a single email address and send today's summary report directly.")
-
-col_email_input, col_email_button = st.columns([3, 1])
-
-with col_email_input:
-    recipient_email = st.text_input("Recipient email", placeholder="someone@example.com")
-
-with col_email_button:
-    st.write("")
-    st.write("")
-    send_now = st.button("Send Today's Report Now")
-
-if send_now:
-    if not recipient_email:
-        st.warning("Please enter an email address first.")
-    else:
-        # Use Pakistan time for choosing 'today' if you care about date rollover
-        try:
-            today_pk = datetime.now(ZoneInfo("Asia/Karachi")).date()
-        except Exception:
-            # Fallback if zoneinfo is not perfectly configured
-            today_pk = datetime.now().date() 
-
-        success = send_email_report([recipient_email], today_pk)
-        if success:
-            st.success(f"Report sent to {recipient_email}")
-
 # ==============================================================================
-# 10. LOYALTY, SEASONALITY, DATA EXPLORER (Rest of the app)
+# 10. LOYALTY, SEASONALITY, DATA EXPLORER (Original Sections 5-8)
 # ==============================================================================
 
 # 5. COMMODITY LOYALTY (New vs. Repeat Count)
