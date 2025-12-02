@@ -182,7 +182,7 @@ if raw_df.empty:
 today = date.today()
 start_of_year = date(today.year, 1, 1)
 last_30_days_start = today - timedelta(days=29) # 30 days including today
-last_7_days_start = today - timedelta(days=6) # NEW METRIC: Last 7 days including today
+last_7_days_start = today - timedelta(days=6) # Last 7 days including today
 
 
 # --- FIX: Define universally safe dates for widget initialization ---
@@ -275,7 +275,8 @@ def create_summary_table(df, period_start, period_end, title):
     
     # Use st.container to ensure the table sits nicely in the column
     with st.container(border=True):
-        st.dataframe(styled_df, use_container_width=True, hide_index=True)
+        # FIX: Added height parameter to prevent internal scrolling in tight columns
+        st.dataframe(styled_df, use_container_width=True, hide_index=True, height=500)
 
 
 col_today, col_7days, col_30days, col_ytd_tables = st.columns(4) # New 4-column layout
