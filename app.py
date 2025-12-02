@@ -24,8 +24,8 @@ st.set_page_config(
 )
 
 # --- Title and Header ---
-st.title("Zaraimandi Sales Dashboard")
-st.markdown("Transaction and Commodity-level Sales Intelligence.")
+st.title("Zaraimandi Sales Dashboard (Gross Sales)")
+st.markdown("Transaction and Commodity-level Gross Sales Intelligence.")
 st.markdown("---")
 
 
@@ -61,12 +61,15 @@ def load_data():
     df["customer_name"] = df["customer_name"].astype(str).str.strip()
     df = df.dropna(subset=["date"])
 
+    # NOTE: Net amount calculation removed. We use amount_pkr for Gross Sales.
+    df['net_amount'] = df['amount_pkr'] # Kept for simplicity, though amounts are now always positive/gross
+
     return df
 
 
 def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Splits transaction rows into one row per commodity, fairly allocating the total amount,
+    Splits transaction rows into one row per commodity, fairly allocating the gross amount,
     with ENHANCED cleaning for de-duplication and non-commodity removal.
     """
     if base_df.empty or "commodities" not in base_df.columns:
@@ -101,7 +104,6 @@ def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
             return None
             
         # Hardcoded list of items to REMOVE (non-commodities or internal tracking)
-        # FIX APPLIED: Removed 'g', 'um', 'l m', 'lm' to prevent filtering valid items like 'sugar'
         NON_COMMODITY_KEYWORDS = [
             'unknown', 'not confirm yet', 'discussion', 'contact sale', 
             'live market', 'data', 'group', 
@@ -152,14 +154,15 @@ def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
     temp = temp[temp["commodity_list"].notna() & (temp["n_commodities"].notna())]
     temp = temp.rename(columns={"commodity_list": "commodity"})
     
-    # Re-calculate amount per commodity after cleaning/explosion
-    temp["amount_per_commodity"] = temp["amount_pkr"] / temp["n_commodities"]
+    # Calculate gross amount per commodity (using amount_pkr, which is always positive)
+    temp["gross_amount_per_commodity"] = temp["amount_pkr"] / temp["n_commodities"]
     
-    return temp[["date", "customer_name", "txn_type", "commodity", "amount_per_commodity", "amount_pkr"]]
+    return temp[["date", "customer_name", "txn_type", "commodity", "gross_amount_per_commodity", "amount_pkr"]]
 
 
+# --- MODIFIED: Sum function now uses 'amount_pkr' (Gross Sales) ---
 def sum_between(df, start, end, amount_col="amount_pkr"):
-    """Calculates the sum of amount between two dates (inclusive)."""
+    """Calculates the GROSS sum of amount between two dates (inclusive)."""
     mask = (df["date"] >= start) & (df["date"] <= end)
     return df.loc[mask, amount_col].sum()
 
@@ -178,14 +181,6 @@ exploded_df = explode_commodities(raw_df)
 
 if raw_df.empty:
     st.stop()
-
-# --- SANITY CHECK FOR DEBUGGING ---
-st.header("--- DEBUG CHECK: SUGAR FIX ---")
-sugar_rows = exploded_df[exploded_df["commodity"].str.contains("Sugar", case=False, na=False)]
-st.write(f"Sugar rows found (Shape 0 = Success!): {sugar_rows.shape[0]}")
-st.dataframe(sugar_rows.head(10))
-st.header("------------------------------------")
-# --- END DEBUG CHECK ---
 
 # Date Calculations
 today = date.today()
@@ -247,7 +242,7 @@ st.markdown("---")
 # 4. KEY PERFORMANCE INDICATORS (KPIs) - RESTRUCTURED VERTICAL SECTIONS
 # ==============================================================================
 
-st.header("Key Performance Indicators (KPIs)")
+st.header("Key Performance Indicators (KPIs) - Gross Sales")
 
 def metric_format(value):
     return f"{CURRENCY_CODE} {value:,.0f}"
@@ -260,12 +255,13 @@ def get_kpi_metrics(start_date, end_date):
     period_mask = (exploded_df["date"] >= start_date) & (exploded_df["date"] <= end_date)
     period_df = exploded_df.loc[period_mask].copy()
 
-    total_amount = period_df["amount_per_commodity"].sum()
+    # NOTE: Using gross_amount_per_commodity for accurate gross sales totals
+    total_amount = period_df["gross_amount_per_commodity"].sum()
     total_transactions = count_transactions(raw_df, start_date, end_date)
     unique_customers = period_df["customer_name"].nunique()
 
-    # Calculate Top Commodity
-    top_commodity_series = period_df.groupby("commodity")["amount_per_commodity"].sum().nlargest(1)
+    # Calculate Top Commodity (based on GROSS amount)
+    top_commodity_series = period_df.groupby("commodity")["gross_amount_per_commodity"].sum().nlargest(1)
     top_commodity_name = top_commodity_series.index[0] if not top_commodity_series.empty else "N/A"
     top_commodity_amount = metric_format(top_commodity_series.iloc[0]) if not top_commodity_series.empty else "N/A"
 
@@ -284,14 +280,16 @@ def create_summary_table_vertical(df, period_title, transactions_count):
     AMOUNT_COL_NAME = f"Amount ({CURRENCY_CODE})"
 
     # Group by customer and commodity to summarize the transaction amount
-    summary_df = df.groupby(["customer_name", "commodity"])["amount_per_commodity"].sum().reset_index()
+    # NOTE: Using gross_amount_per_commodity
+    summary_df = df.groupby(["customer_name", "commodity"])["gross_amount_per_commodity"].sum().reset_index()
     
     summary_df = summary_df.rename(columns={
         "customer_name": "Customer",
         "commodity": "Commodity",
-        "amount_per_commodity": AMOUNT_COL_NAME # Use the calculated name
+        "gross_amount_per_commodity": AMOUNT_COL_NAME # Use the calculated name
     })
     
+    # Sort and format the output
     summary_df = summary_df.sort_values(AMOUNT_COL_NAME, ascending=False)
     
     styled_df = summary_df.style.format({
@@ -405,29 +403,29 @@ st.markdown("Analyzes commodity performance based on the count of unique **New**
 
 # 1. Calculate transaction count per customer per commodity
 txn_count_by_customer_commodity = (
-    exploded_df.groupby(["customer_name", "commodity"])["date"].nunique().reset_index()
+    raw_df.groupby(["customer_name"])["date"].nunique().reset_index()
 )
-# The column used for the count is renamed to "Total Transactions"
 txn_count_by_customer_commodity.rename(columns={"date": "Total Transactions"}, inplace=True)
 
-# 2. Determine Buyer Type (New vs. Repeat) for each customer-commodity pair
-# A buyer is 'Repeat' if their Transaction Count for that commodity > 1.
-# A buyer is 'New' if their Transaction Count for that commodity == 1.
-
+# 2. Determine Buyer Type (New vs. Repeat) for each customer
+# A buyer is 'Repeat' if their Total Transactions > 1.
 txn_count_by_customer_commodity["Buyer Type"] = np.where(
     txn_count_by_customer_commodity["Total Transactions"] > 1, 
     "Repeat", 
     "New"
 )
 
-# 3. Group by Commodity and Buyer Type, then count unique customers
+# 3. Join buyer type back to exploded data to count commodity loyalty
+loyalty_df = exploded_df.merge(txn_count_by_customer_commodity, on='customer_name', how='left')
+
+# 4. Group by Commodity and Buyer Type, then count unique customers
 loyalty_summary = (
-    txn_count_by_customer_commodity.groupby(["commodity", "Buyer Type"])
-    .size()
+    loyalty_df.groupby(["commodity", "Buyer Type"])
+    ["customer_name"].nunique() # Count unique customers in each type
     .unstack(fill_value=0) # Pivot 'New' and 'Repeat' into columns
 )
 
-# 4. Ensure both columns exist for consistency
+# 5. Ensure both columns exist for consistency
 if 'New' not in loyalty_summary.columns:
     loyalty_summary['New'] = 0
 if 'Repeat' not in loyalty_summary.columns:
@@ -435,10 +433,10 @@ if 'Repeat' not in loyalty_summary.columns:
 
 loyalty_summary = loyalty_summary[['Repeat', 'New']] # Order columns
 
-# 5. Calculate Total Buyers (unique customers)
+# 6. Calculate Total Buyers (unique customers)
 loyalty_summary['Total Buyers'] = loyalty_summary['Repeat'] + loyalty_summary['New']
 
-# 6. Final cleanup and sorting by Repeat count
+# 7. Final cleanup and sorting by Repeat count
 loyalty_summary = loyalty_summary.reset_index()
 loyalty_summary = loyalty_summary.sort_values("Repeat", ascending=False)
 loyalty_summary.rename(columns={"Repeat": "Repeat Buyers", "New": "New Buyers"}, inplace=True)
@@ -455,7 +453,7 @@ st.markdown("---")
 
 
 # ==============================================================================
-# 6. COMMODITY SEASONALITY (Functions remain the same)
+# 6. COMMODITY SEASONALITY
 # ==============================================================================
 
 st.header("Commodity Seasonality Analysis")
@@ -466,8 +464,8 @@ seasonality_df = exploded_df.copy()
 seasonality_df["Month"] = seasonality_df["date"].apply(lambda x: x.replace(day=1)) # Normalize date to month start
 seasonality_df["Month_Name"] = seasonality_df["date"].apply(lambda x: x.strftime("%Y-%m"))
 
-seasonality_summary = seasonality_df.groupby(["Month_Name", "commodity"])["amount_per_commodity"].sum().reset_index()
-seasonality_summary.rename(columns={"amount_per_commodity": "Total Sales"}, inplace=True)
+seasonality_summary = seasonality_df.groupby(["Month_Name", "commodity"])["gross_amount_per_commodity"].sum().reset_index()
+seasonality_summary.rename(columns={"gross_amount_per_commodity": "Total Sales"}, inplace=True)
 
 # Select box to pick the commodity for visualization
 commodity_list = sorted(seasonality_summary["commodity"].unique().tolist())
@@ -502,13 +500,13 @@ st.markdown("---")
 # 7. COMMODITY BREAKDOWN (Bar Chart) (Functions remain the same)
 # ==============================================================================
 
-st.header("Commodity Performance & Mix (All Data)")
+st.header("Commodity Performance & Mix (Gross Sales)")
 
 commodity_summary = (
-    exploded_df_filtered.groupby("commodity")["amount_per_commodity"]
+    exploded_df_filtered.groupby("commodity")["gross_amount_per_commodity"]
     .sum()
     .reset_index()
-    .rename(columns={"amount_per_commodity": "Amount"})
+    .rename(columns={"gross_amount_per_commodity": "Amount"})
     .sort_values("Amount", ascending=False)
 )
 
@@ -559,7 +557,7 @@ with col_table:
 st.markdown("---")
 
 # ==============================================================================
-# 8. DATA EXPLORER (Functions remain the same)
+# 8. DATA EXPLORER
 # ==============================================================================
 
 st.header("Data Explorer: Transaction and Commodity Detail")
@@ -572,18 +570,27 @@ data_choice = st.selectbox(
 
 if data_choice == "Raw Transactions (Total Amount)":
     st.subheader("Raw Transaction Data")
-    df_display = raw_df_filtered.sort_values("date", ascending=False).drop(columns=['phone'], errors='ignore')
+    # Display the Gross Amount column
+    df_display = raw_df_filtered.sort_values("date", ascending=False).drop(columns=['phone', 'net_amount'], errors='ignore')
+    
+    # Rename column for display clarity
+    df_display.rename(columns={'amount_pkr': f'Gross Amount ({CURRENCY_CODE})'}, inplace=True)
 
     styled_df = df_display.style.format({
-        "amount_pkr": f"{CURRENCY_CODE} {{:,.0f}}",
+        f'Gross Amount ({CURRENCY_CODE})': f"{CURRENCY_CODE} {{:,.0f}}",
     })
     st.dataframe(styled_df, use_container_width=True)
 
 else:
     st.subheader("Exploded Commodity Data")
+    # Display the Gross Amount per Commodity column
     df_display = exploded_df_filtered.sort_values(["date", "customer_name"], ascending=False).drop(columns=['amount_pkr'], errors='ignore')
+    
+    # Rename column for display clarity
+    df_display.rename(columns={'gross_amount_per_commodity': f'Gross Amount per Commodity ({CURRENCY_CODE})'}, inplace=True)
+
 
     styled_df = df_display.style.format({
-        "amount_per_commodity": f"{CURRENCY_CODE} {{:,.0f}}",
+        f'Gross Amount per Commodity ({CURRENCY_CODE})': f"{CURRENCY_CODE} {{:,.0f}}",
     })
     st.dataframe(styled_df, use_container_width=True)
