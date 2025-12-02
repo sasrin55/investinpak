@@ -35,10 +35,15 @@ st.markdown("---")
 # EMAIL HELPERS (ADVANCED VERSION ONLY)
 # -----------------------------------------------------------------------------
 
-@st.cache_data(show_spinner="Connecting to Google Sheet and loading...")
+@st.cache_data(ttl=300, show_spinner="Connecting to Google Sheet and loading...")
 def cached_load_data():
-    return load_data(use_cache=False)
+    """Load data from Google Sheets and remember when it was refreshed.
 
+    ttl=300 means Streamlit will reload from the Sheet at most every 5 minutes.
+    """
+    df = load_data(use_cache=False)
+    refreshed_at = datetime.now(ZoneInfo("Asia/Karachi"))
+    return df, refreshed_at
 
 def get_commodity_comparisons(exploded_df: pd.DataFrame, report_date: date) -> pd.DataFrame:
     """Calculates WoW and MoM change percentages for the top commodities."""
