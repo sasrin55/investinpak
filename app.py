@@ -182,6 +182,7 @@ if raw_df.empty:
 today = date.today()
 start_of_year = date(today.year, 1, 1)
 last_30_days_start = today - timedelta(days=29) # 30 days including today
+last_7_days_start = today - timedelta(days=6) # NEW METRIC: Last 7 days including today
 
 
 # --- FIX: Define universally safe dates for widget initialization ---
@@ -277,22 +278,32 @@ def create_summary_table(df, period_start, period_end, title):
         st.dataframe(styled_df, use_container_width=True, hide_index=True)
 
 
-col_today, col_30days, col_ytd_tables = st.columns(3)
+col_today, col_7days, col_30days, col_ytd_tables = st.columns(4) # New 4-column layout
 
 # 1. SALES TODAY
 with col_today:
     # Today Amount Metric
     st.subheader("Today's Total Sales")
     
-    # FIX: Use max_data_date to consistently show the most recent day's sales
-    today_sales_date = max_data_date 
+    # FIX: Force the use of the server's calendar date for "Today"
+    today_sales_date = today 
     today_amount = sum_between(raw_df, today_sales_date, today_sales_date)
     st.metric(f"**Total Sales ({today_sales_date.strftime('%b %d')})**", metric_format(today_amount))
     st.markdown("---")
     
-    create_summary_table(exploded_df, today_sales_date, today_sales_date, "Recent Sales Breakdown")
+    create_summary_table(exploded_df, today_sales_date, today_sales_date, "Today's Sales Breakdown")
     
-# 2. LAST 30 DAYS
+# 2. LAST 7 DAYS (NEW METRIC)
+with col_7days:
+    # Last 7 Days Amount Metric
+    st.subheader("Last 7 Days Total Sales")
+    last_7_amount = sum_between(raw_df, last_7_days_start, today)
+    st.metric("**Total Last 7 Days Sales**", metric_format(last_7_amount))
+    st.markdown("---")
+    
+    create_summary_table(exploded_df, last_7_days_start, today, "Last 7 Days Sales Breakdown")
+
+# 3. LAST 30 DAYS
 with col_30days:
     # Last 30 Days Amount Metric
     st.subheader("Last 30 Days Total Sales")
@@ -302,7 +313,7 @@ with col_30days:
     
     create_summary_table(exploded_df, last_30_days_start, today, "Last 30 Days Sales Breakdown")
 
-# 3. YTD SUMMARY & TABLE 
+# 4. YTD SUMMARY & TABLE (Now in 4th column)
 with col_ytd_tables:
     # YTD Amount Metric
     st.subheader("Year-To-Date Total Sales")
@@ -335,7 +346,6 @@ txn_count_by_customer_commodity.rename(columns={"date": "Total Transactions"}, i
 # A buyer is 'New' if their Transaction Count for that commodity == 1.
 
 txn_count_by_customer_commodity["Buyer Type"] = np.where(
-    # Using the correctly renamed column name "Total Transactions"
     txn_count_by_customer_commodity["Total Transactions"] > 1, 
     "Repeat", 
     "New"
