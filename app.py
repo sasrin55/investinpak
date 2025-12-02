@@ -180,43 +180,27 @@ if raw_df.empty:
 
 # Date Calculations
 today = date.today()
-
-# --- FIX: Robust date handling for st.date_input (Type and NaN/NaT checking) ---
-raw_date_min = raw_df["date"].min()
-
-# Determine initial min_data_date, falling back to Jan 1st if missing
-if pd.isna(raw_date_min) or raw_date_min is pd.NaT:
-    min_data_date = date(today.year, 1, 1)
-else:
-    if isinstance(raw_date_min, pd.Timestamp):
-        min_data_date = raw_date_min.date()
-    elif isinstance(raw_date_min, np.datetime64):
-        min_data_date = pd.to_datetime(raw_date_min).date()
-    else:
-        min_data_date = raw_date_min 
-
-max_data_date = raw_df["date"].max()
-if pd.isna(max_data_date) or max_data_date is pd.NaT:
-    max_data_date = today
-else:
-    if isinstance(max_data_date, pd.Timestamp):
-        max_data_date = max_data_date.date()
-    elif isinstance(max_data_date, np.datetime64):
-        max_data_date = pd.to_datetime(max_data_date).date()
-    else:
-        max_data_date = max_data_date
-
-# --- CRITICAL FAIL-SAFE FOR RANGE CONFLICT ---
-# Ensure min_value is never greater than max_value or today
-if min_data_date > max_data_date:
-    min_data_date = max_data_date
-if min_data_date > today:
-    min_data_date = today
-# --- END FIX ---
-
-
 start_of_year = date(today.year, 1, 1)
 last_30_days_start = today - timedelta(days=29) # 30 days including today
+
+
+# --- FIX: Define universally safe dates for widget initialization ---
+safe_min_date = date(2020, 1, 1) # A fixed, safe minimum date
+safe_max_date = today 
+
+# We still need the true min/max data dates for filtering default
+raw_min = raw_df["date"].min()
+raw_max = raw_df["date"].max()
+
+min_data_date = raw_min if pd.notna(raw_min) else start_of_year
+max_data_date = raw_max if pd.notna(raw_max) else today
+
+# Convert to python date objects for use in widget value argument
+if isinstance(min_data_date, pd.Timestamp): min_data_date = min_data_date.date()
+if isinstance(max_data_date, pd.Timestamp): max_data_date = max_data_date.date()
+
+if min_data_date > max_data_date:
+    min_data_date = max_data_date
 
 
 ## 📊 Top-Level Filters
@@ -225,19 +209,19 @@ filter_cols = st.columns([1, 4])
 
 # 1. Date range selector 
 with filter_cols[0]:
+    # Use safe hardcoded dates for min/max boundary, but use the sensible data min for default value
     date_range = st.date_input(
         "Reporting Period",
-        # Pass converted date objects
-        value=(min_data_date, today),
-        min_value=min_data_date,
-        max_value=max_data_date,
+        value=(min_data_date, today), 
+        min_value=safe_min_date,      
+        max_value=safe_max_date,      
         key="top_date_filter"
     )
 
 filter_start_date = min(date_range)
 filter_end_date = max(date_range) if len(date_range) == 2 else date_range[0]
 
-# Apply date filter to both dataframes
+# Apply filter: Use the filtered dates from the widget to filter the actual data
 raw_df_filtered = raw_df[(raw_df["date"] >= filter_start_date) & (raw_df["date"] <= filter_end_date)]
 exploded_df_filtered = exploded_df[(exploded_df["date"] >= filter_start_date) & (exploded_df["date"] <= filter_end_date)]
 
