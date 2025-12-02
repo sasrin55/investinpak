@@ -80,9 +80,8 @@ def send_email_report(recipient_emails: list, report_date: date):
         st.error(f"SMTP credentials not found in st.secrets. Please configure SMTP_USER / SMTP_PASS. Details: {e}")
         return False
 
-    # Calculate TODAY's metrics (using cached data)
-    # We must reload data here because get_kpi_metrics needs raw_df and exploded_df
-    # which are only loaded in the main script block below.
+    # FIX: Ensure data is loaded locally within this context if not global yet
+    # Use cached_load_data() locally here
     try:
         raw_df_local = cached_load_data()
         exploded_df_local = explode_commodities(raw_df_local)
@@ -111,7 +110,7 @@ def send_email_report(recipient_emails: list, report_date: date):
 
 
 # ==============================================================================
-# 2. DATA LOADING AND PRE-CALCULATIONS (Original Section 2)
+# 2. DATA LOADING AND PRE-CALCULATIONS 
 # ==============================================================================
 
 # Custom load_data wrapper to use st.cache_data
@@ -133,7 +132,7 @@ last_7_days_start = today - timedelta(days=6)
 
 
 # --- Date Handling and Filters (CRASH FIX SECTION) ---
-safe_min_date = date(2020, 1, 1) 
+safe_min_date = date(2020, 1, 1) # CRASH FIX: Safe boundary
 safe_max_date = today 
 raw_min = raw_df["date"].min()
 raw_max = raw_df["date"].max()
@@ -148,6 +147,7 @@ if min_data_date > max_data_date: min_data_date = max_data_date
 st.subheader("Reporting Filters")
 filter_cols = st.columns([1, 4])
 with filter_cols[0]:
+    # CRASH FIX: Uses safe_min_date/safe_max_date for boundaries
     date_range = st.date_input(
         "Reporting Period", value=(min_data_date, today), 
         min_value=safe_min_date, max_value=safe_max_date, key="top_date_filter"
@@ -203,7 +203,7 @@ st.markdown("---")
 
 
 # ==============================================================================
-# 4. KEY PERFORMANCE INDICATORS (KPIs) - VERTICAL SECTIONS (Original Section 4)
+# 4. KEY PERFORMANCE INDICATORS (KPIs) - VERTICAL SECTIONS 
 # ==============================================================================
 
 st.header("Key Performance Indicators (KPIs) - Gross Sales")
@@ -271,7 +271,7 @@ txn_count_by_customer_commodity["Buyer Type"] = np.where(
 loyalty_summary = (
     exploded_df.merge(txn_count_by_customer_commodity, on='customer_name', how='left')
     .groupby(["commodity", "Buyer Type"])
-    ["customer_name"].nunique()
+    ["customer_name"].nunique() # Count unique customers in each type
     .unstack(fill_value=0)
 )
 
