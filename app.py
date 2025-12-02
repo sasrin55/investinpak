@@ -523,8 +523,8 @@ with col5:
     top_commodity_amount = current_metrics['top_commodity_amount']
     top_commodity_name = current_metrics['top_commodity_name']
     
-    # NEW LOGIC: Check if the amount is valid before formatting (Fixes the ValueError)
-    if top_commodity_amount and top_commodity_amount > 0:
+    # CORRECTED LOGIC: Use pd.notna and float() to safely check the amount (Fixes TypeError)
+    if pd.notna(top_commodity_amount) and float(top_commodity_amount) > 0:
         sub_value = f"({metric_format(top_commodity_amount)})"
     else:
         # Display a clear message if there are no sales in the period
