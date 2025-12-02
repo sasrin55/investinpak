@@ -33,7 +33,7 @@ st.markdown("---")
 # 2. DATA LOADING AND CLEANUP
 # ==============================================================================
 
-@st.cache_data(show_spinner="Connecting to Data Source and loading...")
+@st.cache_data(show_spinner="Connecting to Google Sheet and loading...")
 def load_data():
     """Reads data, renames columns, and cleans data types."""
     try:
@@ -114,18 +114,14 @@ def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
         mapping = {
             'cotton': 'Cotton', 'coton': 'Cotton', 'cottonmillet': 'Cotton Millet',
             'paddy': 'Paddy', 'padd': 'Paddy',
-            'wheat': 'Wheat', 
-            'wheatandpaddy': 'Wheat & Paddy',
+            'wheat': 'Wheat', 'wheatandpaddy': 'Wheat & Paddy',
             'edibleoil': 'Edible Oil',
             'fertilizer': 'Fertilizer', 
             'pulses': 'Pulses', 'daal': 'Pulses',
             'bajra': 'Bajra',
             'livestock': 'Livestock', 
             'sesame': 'Sesame', 
-            # ENHANCED SUGAR MAPPING:
-            'sugar': 'Sugar', 
-            'sugarsugar': 'Sugar', # Handles cases where 'Sugar, Sugar' becomes 'sugarsugar'
-            'sugarwheat': 'Sugar + Wheat',
+            'sugar': 'Sugar', 'sugarsugar': 'Sugar', 'sugarwheat': 'Sugar + Wheat',
             'mustard': 'Mustard', 'mustrad': 'Mustard',
             'kiryana': 'Kiryana',
             'dryfruits': 'Dry Fruits',
