@@ -2,12 +2,14 @@ import pandas as pd
 import numpy as np
 import re
 from datetime import date, timedelta
+from typing import Dict, Any, List
 
-# --- SETTINGS ---
+# --- SETTINGS (FIXED) ---
 SHEET_ID = "1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q"
 TAB_NAME = "Master"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={TAB_NAME}"
 CURRENCY_CODE = "PKR"
+CURRENCY_FORMAT = ",.0f" # <-- NOW DEFINED HERE
 
 # --- HELPER FUNCTIONS ---
 
@@ -26,13 +28,11 @@ def metric_format(value):
 
 # --- DATA FUNCTIONS ---
 
-def load_data(use_cache=True):
+def load_data(use_cache=False):
     """Reads data, renames columns, and cleans data types."""
-    # Note: st.cache_data is removed here because this file runs outside Streamlit's context
     try:
         df = pd.read_csv(CSV_URL)
     except Exception as e:
-        # In a cron job, this will just log the error
         raise Exception(f"Error loading data from Google Sheet: {e}")
 
     cols = df.columns
@@ -61,11 +61,15 @@ def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
 
     temp = base_df.copy()
     temp["commodities"] = temp["commodities"].fillna("").astype(str)
+
+    # Normalize separators to commas
     temp["commodities_clean"] = (
         temp["commodities"]
         .str.replace(r"[\s]*[&\/]| and ", ",", regex=True)
         .str.strip()
     )
+
+    # Build list of commodities
     temp["commodity_list"] = temp["commodities_clean"].apply(
         lambda s: [x.strip() for x in s.split(",") if x.strip() != ""]
     )
@@ -113,7 +117,7 @@ def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
     return temp[["date", "customer_name", "txn_type", "commodity", "gross_amount_per_commodity", "amount_pkr"]]
 
 
-def get_kpi_metrics(raw_df, exploded_df, start_date, end_date):
+def get_kpi_metrics(raw_df, exploded_df, start_date, end_date) -> Dict[str, Any]:
     """Calculates all metrics for a given period."""
     
     # Total Amount: Calculated directly from RAW data for Gross Sum accuracy
