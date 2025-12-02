@@ -1,20 +1,17 @@
 import pandas as pd
 import streamlit as st
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 import altair as alt
 import numpy as np
 import re
-
-# ==============================================================================
-# 1. CONFIGURATION AND INITIAL SETUP
-# ==============================================================================
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from zoneinfo import ZoneInfo
+from report_utils import load_data, explode_commodities, get_kpi_metrics, metric_format, count_transactions, sum_between, CURRENCY_CODE
 
 # --- SETTINGS ---
-SHEET_ID = "1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q"
-TAB_NAME = "Master"
-CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={TAB_NAME}"
-CURRENCY_CODE = "PKR"
-CURRENCY_FORMAT = ",.0f" 
+# Sheet ID and URL are now handled in report_utils.py
 
 # Configure the page layout (Standard, stable arguments)
 st.set_page_config(
@@ -30,151 +27,15 @@ st.markdown("---")
 
 
 # ==============================================================================
-# 2. DATA LOADING AND CLEANUP
+# 2. DATA LOADING AND PRE-CALCULATIONS (Using functions from report_utils)
 # ==============================================================================
 
+# Custom load_data wrapper to use st.cache_data
 @st.cache_data(show_spinner="Connecting to Google Sheet and loading...")
-def load_data():
-    """Reads data, renames columns, and cleans data types."""
-    try:
-        df = pd.read_csv(CSV_URL)
-    except Exception as e:
-        st.error(f"Error connecting to Google Sheet. Check ID, tab name, and permissions. Details: {e}")
-        st.stop()
-        return pd.DataFrame()
+def cached_load_data():
+    return load_data(use_cache=False) # Delegate loading to report_utils
 
-    cols = df.columns
-    if len(cols) < 6:
-        st.error(f"Data structure error: Expected at least 6 columns, found {len(cols)}. Check the '{TAB_NAME}' tab.")
-        st.stop()
-
-    rename_map = {
-        cols[0]: "date", cols[1]: "customer_name", cols[2]: "phone",
-        cols[3]: "txn_type", cols[4]: "commodities", cols[5]: "amount_pkr",
-    }
-    df = df.rename(columns=rename_map)
-
-    # Convert date and amount, dropping rows with invalid dates afterward
-    df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.date
-    df["amount_pkr"] = pd.to_numeric(df["amount_pkr"], errors="coerce").fillna(0)
-    df["txn_type"] = df["txn_type"].astype(str).str.strip().str.title()
-    df["customer_name"] = df["customer_name"].astype(str).str.strip()
-    df = df.dropna(subset=["date"])
-
-    # We only use amount_pkr (gross) for all totals
-    return df
-
-
-def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Splits transaction rows into one row per commodity, fairly allocating the gross amount,
-    with ENHANCED cleaning for de-duplication and non-commodity removal.
-    """
-    if base_df.empty or "commodities" not in base_df.columns:
-        return base_df.copy()
-
-    temp = base_df.copy()
-    temp["commodities"] = temp["commodities"].fillna("").astype(str)
-
-    # Normalize separators to commas
-    temp["commodities_clean"] = (
-        temp["commodities"]
-        .str.replace(r"[\s]*[&\/]| and ", ",", regex=True)
-        .str.strip()
-    )
-
-    # Build list of commodities
-    temp["commodity_list"] = temp["commodities_clean"].apply(
-        lambda s: [x.strip() for x in s.split(",") if x.strip() != ""]
-    )
-    
-    # --- AGGRESSIVE COMMODITY CLEANING/NORMALIZATION ---
-    def normalize_commodity_name(name):
-        if not name:
-            return None
-        
-        # 1. Convert to lowercase and strip punctuation/extra spaces
-        name = name.lower().strip()
-        name_clean = re.sub(r'[^\w\s]', '', name)
-        name_clean = re.sub(r'\s+', ' ', name_clean).strip()
-        
-        if not name_clean:
-            return None
-            
-        # Hardcoded list of items to REMOVE (non-commodities or internal tracking)
-        NON_COMMODITY_KEYWORDS = [
-            'unknown', 'not confirm yet', 'discussion', 'contact sale', 
-            'live market', 'data', 'group', 
-            'fruits', 'fruit', 'vegetables', 'vegetable' 
-        ]
-        
-        if any(keyword in name_clean for keyword in NON_COMMODITY_KEYWORDS):
-            return None
-
-        # Consolidation mapping for common misspellings/variants
-        mapping = {
-            'cotton': 'Cotton', 'coton': 'Cotton', 'cottonmillet': 'Cotton Millet',
-            'paddy': 'Paddy', 'padd': 'Paddy',
-            'wheat': 'Wheat', 'wheatandpaddy': 'Wheat & Paddy',
-            'edibleoil': 'Edible Oil',
-            'fertilizer': 'Fertilizer', 
-            'pulses': 'Pulses', 'daal': 'Pulses',
-            'bajra': 'Bajra',
-            'livestock': 'Livestock', 
-            'sesame': 'Sesame', 
-            'sugar': 'Sugar', 'sugarsugar': 'Sugar', 'sugarwheat': 'Sugar + Wheat',
-            'mustard': 'Mustard', 'mustrad': 'Mustard',
-            'kiryana': 'Kiryana',
-            'dryfruits': 'Dry Fruits',
-            'spices': 'Spices',
-            'rice': 'Rice',
-            'maize': 'Maize',
-            'dates': 'Dates'
-        }
-        
-        # Apply mapping: Check the clean name against the map keys
-        if name_clean in mapping:
-            return mapping[name_clean]
-        
-        # If not found in mapping, return Title Case version
-        return name_clean.title()
-
-    temp["commodity_list"] = temp["commodity_list"].apply(
-        lambda lst: [normalize_commodity_name(item) for item in lst if normalize_commodity_name(item) is not None]
-    )
-    # ---------------------------------------------------
-
-    temp["n_commodities"] = temp["commodity_list"].apply(
-        lambda lst: len(lst) if len(lst) > 0 else np.nan
-    )
-
-    temp = temp.explode("commodity_list")
-    temp = temp[temp["commodity_list"].notna() & (temp["n_commodities"].notna())]
-    temp = temp.rename(columns={"commodity_list": "commodity"})
-    
-    # Calculate gross amount per commodity (using amount_pkr, which is always positive)
-    temp["gross_amount_per_commodity"] = temp["amount_pkr"] / temp["n_commodities"]
-    
-    return temp[["date", "customer_name", "txn_type", "commodity", "gross_amount_per_commodity", "amount_pkr"]]
-
-
-def sum_between(df, start, end, amount_col="amount_pkr"):
-    """Calculates the GROSS sum of amount between two dates (inclusive)."""
-    mask = (df["date"] >= start) & (df["date"] <= end)
-    # FIX: Ensure this always sums the gross column
-    return df.loc[mask, amount_col].sum()
-
-def count_transactions(df, start, end):
-    """Counts the number of unique transactions (rows in the raw data)."""
-    mask = (df["date"] >= start) & (df["date"] <= end)
-    return df.loc[mask].shape[0]
-
-
-# ==============================================================================
-# 3. DATA LOADING, FILTERING, AND PRE-CALCULATIONS
-# ==============================================================================
-
-raw_df = load_data()
+raw_df = cached_load_data()
 exploded_df = explode_commodities(raw_df)
 
 if raw_df.empty:
@@ -183,51 +44,34 @@ if raw_df.empty:
 # Date Calculations
 today = date.today()
 start_of_year = date(today.year, 1, 1)
-last_30_days_start = today - timedelta(days=29) # 30 days including today
-last_7_days_start = today - timedelta(days=6) # Last 7 days including today
+last_30_days_start = today - timedelta(days=29)
+last_7_days_start = today - timedelta(days=6)
 
 
-# --- FIX: Define universally safe dates for widget initialization ---
-safe_min_date = date(2020, 1, 1) # A fixed, safe minimum date
+# --- Date Handling and Filters (Copied from previous steps for consistency) ---
+safe_min_date = date(2020, 1, 1)
 safe_max_date = today 
-
-# We still need the true min/max data dates for filtering default
 raw_min = raw_df["date"].min()
 raw_max = raw_df["date"].max()
-
 min_data_date = raw_min if pd.notna(raw_min) else start_of_year
 max_data_date = raw_max if pd.notna(raw_max) else today
-
-# Convert to python date objects for use in widget value argument
 if isinstance(min_data_date, pd.Timestamp): min_data_date = min_data_date.date()
 if isinstance(max_data_date, pd.Timestamp): max_data_date = max_data_date.date()
+if min_data_date > max_data_date: min_data_date = max_data_date
 
-if min_data_date > max_data_date:
-    min_data_date = max_data_date
-
-
-## 📊 Top-Level Filters
 st.subheader("Reporting Filters")
 filter_cols = st.columns([1, 4])
-
-# 1. Date range selector 
 with filter_cols[0]:
-    # Use safe hardcoded dates for min/max boundary, but use the sensible data min for default value
     date_range = st.date_input(
-        "Reporting Period",
-        value=(min_data_date, today), 
-        min_value=safe_min_date,      
-        max_value=safe_max_date,      
-        key="top_date_filter"
+        "Reporting Period", value=(min_data_date, today), 
+        min_value=safe_min_date, max_value=safe_max_date, key="top_date_filter"
     )
 
 filter_start_date = min(date_range)
 filter_end_date = max(date_range) if len(date_range) == 2 else date_range[0]
 
-# Apply filter: Use the filtered dates from the widget to filter the actual data
 raw_df_filtered = raw_df[(raw_df["date"] >= filter_start_date) & (raw_df["date"] <= filter_end_date)]
 exploded_df_filtered = exploded_df[(exploded_df["date"] >= filter_start_date) & (exploded_df["date"] <= filter_end_date)]
-
 
 if raw_df_filtered.empty or exploded_df_filtered.empty:
     st.warning("No data matches the current date filter criteria. Please adjust your selections.")
@@ -235,362 +79,166 @@ if raw_df_filtered.empty or exploded_df_filtered.empty:
 
 st.markdown("---")
 
-
 # ==============================================================================
-# 4. KEY PERFORMANCE INDICATORS (KPIs) - RESTRUCTURED VERTICAL SECTIONS
+# 4. KEY PERFORMANCE INDICATORS (KPIs) - VERTICAL SECTIONS
 # ==============================================================================
 
 st.header("Key Performance Indicators (KPIs) - Gross Sales")
 
-def metric_format(value):
-    return f"{CURRENCY_CODE} {value:,.0f}"
-
-# --- NEW HELPER FUNCTIONS FOR VERTICAL KPI ---
-
-def get_kpi_metrics(start_date, end_date):
-    """Calculates all metrics and returns the filtered exploded DataFrame for a period."""
-    
-    # FIX: Calculate Total Amount directly from RAW data (amount_pkr) for Gross Sum accuracy
-    raw_period_mask = (raw_df["date"] >= start_date) & (raw_df["date"] <= end_date)
-    total_amount = raw_df.loc[raw_period_mask, "amount_pkr"].sum()
-
-    period_mask = (exploded_df["date"] >= start_date) & (exploded_df["date"] <= end_date)
-    period_df = exploded_df.loc[period_mask].copy()
-
-    total_transactions = count_transactions(raw_df, start_date, end_date)
-    unique_customers = period_df["customer_name"].nunique()
-
-    # Calculate Top Commodity (based on GROSS amount per commodity)
-    top_commodity_series = period_df.groupby("commodity")["gross_amount_per_commodity"].sum().nlargest(1)
-    top_commodity_name = top_commodity_series.index[0] if not top_commodity_series.empty else "N/A"
-    top_commodity_amount = metric_format(top_commodity_series.iloc[0]) if not top_commodity_series.empty else "N/A"
-
-    return {
-        "df": period_df,
-        "total_amount": total_amount, # Uses direct RAW sum
-        "total_transactions": total_transactions,
-        "unique_customers": unique_customers,
-        "top_commodity_name": top_commodity_name,
-        "top_commodity_amount": top_commodity_amount
-    }
-
 def create_summary_table_vertical(df, period_title, transactions_count):
     """Generates the detailed table for the vertical sections."""
-    
     AMOUNT_COL_NAME = f"Amount ({CURRENCY_CODE})"
-
-    # Group by customer and commodity to summarize the transaction amount
-    # NOTE: Using gross_amount_per_commodity
     summary_df = df.groupby(["customer_name", "commodity"])["gross_amount_per_commodity"].sum().reset_index()
-    
-    summary_df = summary_df.rename(columns={
-        "customer_name": "Customer",
-        "commodity": "Commodity",
-        "gross_amount_per_commodity": AMOUNT_COL_NAME # Use the calculated name
-    })
-    
-    # Sort and format the output
+    summary_df = summary_df.rename(columns={"customer_name": "Customer", "commodity": "Commodity", "gross_amount_per_commodity": AMOUNT_COL_NAME})
     summary_df = summary_df.sort_values(AMOUNT_COL_NAME, ascending=False)
-    
-    styled_df = summary_df.style.format({
-        AMOUNT_COL_NAME: f"{CURRENCY_CODE} {{:,.0f}}",
-    })
+    styled_df = summary_df.style.format({AMOUNT_COL_NAME: f"{CURRENCY_CODE} {{:,.0f}}",})
     
     st.subheader(f"Detailed Breakdown (Total Transactions: {transactions_count})")
-    
-    # Use st.container to ensure the table sits nicely in the column
     with st.container(border=True):
-        # Increased height to eliminate internal scrolling
         st.dataframe(styled_df, use_container_width=True, hide_index=True, height=500)
 
 
 # --- RENDER ALL KPI SECTIONS VERTICALLY ---
 
-# 1. TODAY'S SALES
-st.markdown("## Today's Sales Performance")
-today_sales_date = today 
-today_metrics = get_kpi_metrics(today_sales_date, today_sales_date)
+def render_kpi_block(title, start_date, end_date):
+    st.markdown(f"## {title}")
+    metrics = get_kpi_metrics(raw_df, exploded_df, start_date, end_date)
 
-col_t1, col_t2, col_t3, col_t4 = st.columns(4)
-with col_t1:
-    st.metric("**Total Sales**", metric_format(today_metrics["total_amount"]))
-with col_t2:
-    st.metric("**Total Transactions**", today_metrics["total_transactions"])
-with col_t3:
-    st.metric("**Unique Customers**", today_metrics["unique_customers"])
-with col_t4:
-    st.metric("**Top Commodity**", f"{today_metrics['top_commodity_name']} ({today_metrics['top_commodity_amount']})")
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("**Total Sales**", metric_format(metrics["total_amount"]))
+    with col2:
+        st.metric("**Total Transactions**", metrics["total_transactions"])
+    with col3:
+        st.metric("**Unique Customers**", metrics["unique_customers"])
+    with col4:
+        st.metric("**Top Commodity**", f"{metrics['top_commodity_name']} ({metrics['top_commodity_amount']})")
 
-create_summary_table_vertical(
-    today_metrics["df"], 
-    "Today's Sales Breakdown", 
-    today_metrics["total_transactions"]
-)
-st.markdown("---")
-
-
-# 2. LAST 7 DAYS
-st.markdown("## Last 7 Days Performance")
-last_7_metrics = get_kpi_metrics(last_7_days_start, today)
-
-col_7_1, col_7_2, col_7_3, col_7_4 = st.columns(4)
-with col_7_1:
-    st.metric("**Total Sales**", metric_format(last_7_metrics["total_amount"]))
-with col_7_2:
-    st.metric("**Total Transactions**", last_7_metrics["total_transactions"])
-with col_7_3:
-    st.metric("**Unique Customers**", last_7_metrics["unique_customers"])
-with col_7_4:
-    st.metric("**Top Commodity**", f"{last_7_metrics['top_commodity_name']} ({last_7_metrics['top_commodity_amount']})")
-
-create_summary_table_vertical(
-    last_7_metrics["df"], 
-    "Last 7 Days Breakdown", 
-    last_7_metrics["total_transactions"]
-)
-st.markdown("---")
-
-
-# 3. LAST 30 DAYS
-st.markdown("## Last 30 Days Performance")
-last_30_metrics = get_kpi_metrics(last_30_days_start, today)
-
-col_30_1, col_30_2, col_30_3, col_30_4 = st.columns(4)
-with col_30_1:
-    st.metric("**Total Sales**", metric_format(last_30_metrics["total_amount"]))
-with col_30_2:
-    st.metric("**Total Transactions**", last_30_metrics["total_transactions"])
-with col_30_3:
-    st.metric("**Unique Customers**", last_30_metrics["unique_customers"])
-with col_30_4:
-    st.metric("**Top Commodity**", f"{last_30_metrics['top_commodity_name']} ({last_30_metrics['top_commodity_amount']})")
-
-create_summary_table_vertical(
-    last_30_metrics["df"], 
-    "Last 30 Days Breakdown", 
-    last_30_metrics["total_transactions"]
-)
-st.markdown("---")
-
-
-# 4. YEAR-TO-DATE
-st.markdown("## Year-to-Date (YTD) Performance")
-ytd_metrics = get_kpi_metrics(start_of_year, today)
-
-col_ytd_1, col_ytd_2, col_ytd_3, col_ytd_4 = st.columns(4)
-with col_ytd_1:
-    st.metric("**Total Sales**", metric_format(ytd_metrics["total_amount"]))
-with col_ytd_2:
-    st.metric("**Total Transactions**", ytd_metrics["total_transactions"])
-with col_ytd_3:
-    st.metric("**Unique Customers**", ytd_metrics["unique_customers"])
-with col_ytd_4:
-    st.metric("**Top Commodity**", f"{ytd_metrics['top_commodity_name']} ({ytd_metrics['top_commodity_amount']})")
-
-create_summary_table_vertical(
-    ytd_metrics["df"], 
-    "YTD Sales Breakdown", 
-    ytd_metrics["total_transactions"]
-)
-st.markdown("---")
-
-# ==============================================================================
-# 5. COMMODITY LOYALTY (New vs. Repeat Count)
-# ==============================================================================
-
-st.header("Commodity Loyalty Analysis")
-st.markdown("Analyzes commodity performance based on the count of unique **New** vs. **Repeat** buyers across the entire dataset.")
-
-# 1. Calculate transaction count per customer per commodity
-txn_count_by_customer_commodity = (
-    raw_df.groupby(["customer_name"])["date"].nunique().reset_index()
-)
-txn_count_by_customer_commodity.rename(columns={"date": "Total Transactions"}, inplace=True)
-
-# 2. Determine Buyer Type (New vs. Repeat) for each customer
-# A buyer is 'Repeat' if their Total Transactions > 1.
-txn_count_by_customer_commodity["Buyer Type"] = np.where(
-    txn_count_by_customer_commodity["Total Transactions"] > 1, 
-    "Repeat", 
-    "New"
-)
-
-# 3. Join buyer type back to exploded data to count commodity loyalty
-loyalty_df = exploded_df.merge(txn_count_by_customer_commodity, on='customer_name', how='left')
-
-# 4. Group by Commodity and Buyer Type, then count unique customers
-loyalty_summary = (
-    loyalty_df.groupby(["commodity", "Buyer Type"])
-    ["customer_name"].nunique() # Count unique customers in each type
-    .unstack(fill_value=0) # Pivot 'New' and 'Repeat' into columns
-)
-
-# 5. Ensure both columns exist for consistency
-if 'New' not in loyalty_summary.columns:
-    loyalty_summary['New'] = 0
-if 'Repeat' not in loyalty_summary.columns:
-    loyalty_summary['Repeat'] = 0
-
-loyalty_summary = loyalty_summary[['Repeat', 'New']] # Order columns
-
-# 6. Calculate Total Buyers (unique customers)
-loyalty_summary['Total Buyers'] = loyalty_summary['Repeat'] + loyalty_summary['New']
-
-# 7. Final cleanup and sorting by Repeat count
-loyalty_summary = loyalty_summary.reset_index()
-loyalty_summary = loyalty_summary.sort_values("Repeat", ascending=False)
-loyalty_summary.rename(columns={"Repeat": "Repeat Buyers", "New": "New Buyers"}, inplace=True)
-
-st.subheader("Commodity Buyer Loyalty (Ranked by Repeat Buyers)")
-
-if not loyalty_summary.empty:
-    st.dataframe(loyalty_summary, use_container_width=True, hide_index=True)
-else:
-    st.info("No sales data available to analyze buyer loyalty.")
-
-
-st.markdown("---")
-
-
-# ==============================================================================
-# 6. COMMODITY SEASONALITY (Functions remain the same)
-# ==============================================================================
-
-st.header("Commodity Seasonality Analysis")
-st.markdown("Sales trend by month to identify peak selling seasons for each commodity.")
-
-# Prepare data for Altair chart
-seasonality_df = exploded_df.copy()
-seasonality_df["Month"] = seasonality_df["date"].apply(lambda x: x.replace(day=1)) # Normalize date to month start
-seasonality_df["Month_Name"] = seasonality_df["date"].apply(lambda x: x.strftime("%Y-%m"))
-
-seasonality_summary = seasonality_df.groupby(["Month_Name", "commodity"])["gross_amount_per_commodity"].sum().reset_index()
-seasonality_summary.rename(columns={"gross_amount_per_commodity": "Total Sales"}, inplace=True)
-
-# Select box to pick the commodity for visualization
-commodity_list = sorted(seasonality_summary["commodity"].unique().tolist())
-selected_season_commodity = st.selectbox(
-    "Select Commodity for Seasonality Chart",
-    options=commodity_list,
-    index=0 # Default to the first commodity
-)
-
-seasonality_chart_data = seasonality_summary[seasonality_summary["commodity"] == selected_season_commodity]
-
-if not seasonality_chart_data.empty:
-    # Altair chart definition
-    season_chart = alt.Chart(seasonality_chart_data).mark_line(point=True).encode(
-        x=alt.X("Month_Name:T", title="Month", axis=alt.Axis(format="%Y-%m")),
-        y=alt.Y("Total Sales:Q", title=f"Total Sales ({CURRENCY_CODE})", axis=alt.Axis(format=CURRENCY_FORMAT)),
-        tooltip=[
-            alt.Tooltip("Month_Name:T", title="Month", format="%Y-%m"),
-            alt.Tooltip("Total Sales:Q", title="Sales Amount", format=CURRENCY_FORMAT)
-        ]
-    ).properties(
-        title=f"Monthly Sales Trend for {selected_season_commodity}"
-    ).interactive()
-
-    st.altair_chart(season_chart, use_container_width=True)
-else:
-    st.info(f"No seasonality data found for {selected_season_commodity} in the dataset.")
-
-st.markdown("---")
-
-# ==============================================================================
-# 7. COMMODITY BREAKDOWN (Bar Chart) (Functions remain the same)
-# ==============================================================================
-
-st.header("Commodity Performance & Mix (Gross Sales)")
-
-commodity_summary = (
-    exploded_df_filtered.groupby("commodity")["gross_amount_per_commodity"]
-    .sum()
-    .reset_index()
-    .rename(columns={"gross_amount_per_commodity": "Amount"})
-    .sort_values("Amount", ascending=False)
-)
-
-col_chart, col_table = st.columns([2, 1])
-
-with col_chart:
-    st.subheader("Top Selling Commodities (Volume)")
-
-    max_commodities = len(commodity_summary)
-    top_n_default = min(10, max_commodities)
-    
-    top_n = st.slider(
-        "Select Top N Commodities to Display", 
-        1, 
-        max_commodities, 
-        top_n_default, 
-        key="top_n_slider"
+    create_summary_table_vertical(
+        metrics["df"], title, metrics["total_transactions"]
     )
+    st.markdown("---")
+    return metrics # Return metrics for potential email use
 
-    top_commodity_summary = commodity_summary.head(top_n)
+render_kpi_block("Today's Sales Performance", today, today)
+render_kpi_block("Last 7 Days Performance", last_7_days_start, today)
+render_kpi_block("Last 30 Days Performance", last_30_days_start, today)
+render_kpi_block("Year-to-Date (YTD) Performance", start_of_year, today)
 
-    # Altair Bar Chart
-    chart_bar = alt.Chart(top_commodity_summary).mark_bar().encode(
-        x=alt.X("Amount:Q", title=f"Total Sales ({CURRENCY_CODE})", axis=alt.Axis(format=CURRENCY_FORMAT)),
-        y=alt.Y("commodity:N", sort="-x", title="Commodity"),
-        tooltip=[
-            alt.Tooltip("commodity:N", title="Commodity"),
-            alt.Tooltip("Amount:Q", title="Sales Amount", format=CURRENCY_FORMAT)
-        ]
-    ).properties(
-        title=f"Top {top_n} Commodities by Sales Amount"
-    ).interactive() # Allow zoom/pan
+# ==============================================================================
+# 5. EMAIL HELPERS (For On-Demand Button)
+# ==============================================================================
 
-    st.altair_chart(chart_bar, use_container_width=True)
+# Note: This logic is duplicated in daily_email_runner.py, but is kept here
+# to avoid circular imports and allow the scheduled runner to run outside Streamlit.
 
-with col_table:
-    st.subheader("Summary Table")
-    styled_df = commodity_summary.style.format({
-        "Amount": f"{CURRENCY_CODE} {{:,.0f}}",
-    })
+def build_daily_email_html(report_date: date, metrics: dict):
+    """Builds a simple HTML email for a given date using cached KPI data."""
+    
+    rows_html = ""
+    top_table = metrics["df"].groupby("commodity")["gross_amount_per_commodity"].sum().reset_index().sort_values("gross_amount_per_commodity", ascending=False).head(5)
+    
+    for _, row in top_table.iterrows():
+        rows_html += f"""
+        <tr>
+            <td>{row['commodity']}</td>
+            <td style="text-align:right">{CURRENCY_CODE} {row['gross_amount_per_commodity']:,.0f}</td>
+        </tr>
+        """
+    
+    html = f"""
+    <html>
+    <body>
+        <h2>Zaraimandi Daily Report for {report_date}</h2>
+        <p><b>Total sales:</b> {metric_format(metrics["total_amount"])}</p>
+        <p><b>Total transactions:</b> {metrics["total_transactions"]}</p>
+        <p><b>Unique customers:</b> {metrics["unique_customers"]}</p>
+        <p><b>Top commodity:</b> {metrics["top_commodity_name"]} ({metrics["top_commodity_amount"]})</p>
 
-    st.dataframe(
-        styled_df,
-        use_container_width=True,
-        hide_index=True
-    )
+        <h3>Top 5 Commodities</h3>
+        <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;">
+            <tr>
+                <th>Commodity</th>
+                <th>Amount ({CURRENCY_CODE})</th>
+            </tr>
+            {rows_html}
+        </table>
+
+        <p style="margin-top:18px;">
+            <a href="YOUR_STREAMLIT_APP_URL_HERE" target="_blank">Open Full Interactive Dashboard</a>
+        </p>
+    </body>
+    </html>
+    """
+    return html
+
+def send_email_report(recipient_emails: list, report_date: date):
+    """Send the HTML report email to multiple recipients using st.secrets."""
+    try:
+        smtp_user = st.secrets["SMTP_USER"]
+        smtp_pass = st.secrets["SMTP_PASS"]
+        smtp_server = st.secrets.get("SMTP_SERVER", "smtp.gmail.com")
+        smtp_port = int(st.secrets.get("SMTP_PORT", 465))
+    except Exception as e:
+        st.error(f"SMTP credentials not found in st.secrets. Details: {e}")
+        return False
+
+    # Calculate TODAY's metrics (using cached data)
+    metrics = get_kpi_metrics(raw_df, exploded_df, report_date, report_date)
+    
+    html_body = build_daily_email_html(report_date, metrics)
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"Zaraimandi Daily Sales Report – {report_date}"
+    msg["From"] = smtp_user
+    msg["To"] = ", ".join(recipient_emails)
+
+    msg.attach(MIMEText(html_body, "html"))
+
+    try:
+        with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_user, recipient_emails, msg.as_string())
+        return True
+    except Exception as e:
+        st.error(f"Error sending email: {e}")
+        return False
+
+# ------------------------------------------------------------------
+# 9. EMAIL REPORT FROM DASHBOARD UI (ON-DEMAND BUTTON)
+# ------------------------------------------------------------------
+
+st.markdown("---")
+st.header("Email this report (On-Demand)")
+
+st.caption("Enter a single email address and send today's summary report directly.")
+
+col_email_input, col_email_button = st.columns([3, 1])
+
+with col_email_input:
+    recipient_email = st.text_input("Recipient email", placeholder="someone@example.com")
+
+with col_email_button:
+    # Use a dummy variable for button positioning
+    st.write("")
+    st.write("")
+    send_now = st.button("Send Today's Report Now")
+
+if send_now:
+    if not recipient_email:
+        st.warning("Please enter an email address first.")
+    else:
+        today_pk = datetime.now(ZoneInfo("Asia/Karachi")).date()
+        success = send_email_report([recipient_email], today_pk)
+        if success:
+            st.success(f"Report sent to {recipient_email}")
 
 st.markdown("---")
 
 # ==============================================================================
-# 8. DATA EXPLORER
+# 10. LOYALTY, SEASONALITY, DATA EXPLORER (Rest of the app)
 # ==============================================================================
 
-st.header("Data Explorer: Transaction and Commodity Detail")
-st.caption(f"Showing data for period: {filter_start_date.strftime('%b %d, %Y')} to {filter_end_date.strftime('%b %d, %Y')}")
-
-data_choice = st.selectbox(
-    "Select Data View:",
-    options=["Raw Transactions (Total Amount)", "Exploded Data (Commodity Level Amount)"]
-)
-
-if data_choice == "Raw Transactions (Total Amount)":
-    st.subheader("Raw Transaction Data")
-    # Display the Gross Amount column
-    df_display = raw_df_filtered.sort_values("date", ascending=False).drop(columns=['phone'], errors='ignore')
-    
-    # Rename column for display clarity
-    df_display.rename(columns={'amount_pkr': f'Gross Amount ({CURRENCY_CODE})'}, inplace=True)
-
-    styled_df = df_display.style.format({
-        f'Gross Amount ({CURRENCY_CODE})': f"{CURRENCY_CODE} {{:,.0f}}",
-    })
-    st.dataframe(styled_df, use_container_width=True)
-
-else:
-    st.subheader("Exploded Commodity Data")
-    # Display the Gross Amount per Commodity column
-    df_display = exploded_df_filtered.sort_values(["date", "customer_name"], ascending=False).drop(columns=['amount_pkr'], errors='ignore')
-    
-    # Rename column for display clarity
-    df_display.rename(columns={'gross_amount_per_commodity': f'Gross Amount per Commodity ({CURRENCY_CODE})'}, inplace=True)
-
-
-    styled_df = df_display.style.format({
-        f'Gross Amount per Commodity ({CURRENCY_CODE})': f"{CURRENCY_CODE} {{:,.0f}}",
-    })
-    st.dataframe(styled_df, use_container_width=True)
+# ... (Sections 5, 6, 7, 8 go here, using exploded_df and raw_df as loaded) ...
+# I will omit the rest of the code here as it remains unchanged from the last block
+# you received, but it must be included in your final app.py file.
