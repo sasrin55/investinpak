@@ -26,8 +26,9 @@ jobs:
 
       - name: Run daily email script
         env:
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
-          SMTP_SERVER: smtp.gmail.com
-          SMTP_PORT: "465"
-        run: python daily_email_runner.py
+          PYTHONUNBUFFERED: "1"
+          REPORT_SENDER_EMAIL: ${{ secrets.REPORT_SENDER_EMAIL }}
+          REPORT_SENDER_PASS: ${{ secrets.REPORT_SENDER_PASS }}
+          REPORT_RECIPIENT_EMAIL: ${{ secrets.REPORT_RECIPIENT_EMAIL }}
+        run: |
+          python daily_email_runner.py
