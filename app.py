@@ -473,30 +473,32 @@ def render_kpi_block(title, start_date, end_date):
     with col3:
         st.metric("**Unique Customers**", metrics["unique_customers"])
     with col4:
-        top_commodity_name = metrics['top_commodity_name']
-        top_commodity_amount = metrics['top_commodity_amount']
-        
-        # FINAL STABILIZING FIX: Safely check and format amount
-        # Ensure the value is not None/NaN before formatting.
-        if top_commodity_amount is not None and top_commodity_amount != 0:
-            # Use metric_format and strip any default parentheses
-            # This relies on metric_format outputting "(PKR 1,234)" which .strip() removes
-            formatted_amount = metric_format(top_commodity_amount).strip('()')
-            display_value = f"{top_commodity_name} {formatted_amount}"
-        else:
+        top_commodity_name = metrics["top_commodity_name"]
+        top_commodity_amount = metrics["top_commodity_amount"]
+
+        # Handle both numeric and already-formatted values safely
+        if top_commodity_amount is None:
             display_value = "N/A (No Sales)"
-            
-        st.metric(
-            "**Top Commodity**",
-            display_value,
-        )
+        else:
+            # If it's numeric, format it; if it's a string, just use it
+            if isinstance(top_commodity_amount, (int, float, np.number)):
+                formatted_amount = metric_format(top_commodity_amount)
+            else:
+                # already formatted string like "PKR 9,400"
+                formatted_amount = str(top_commodity_amount)
+
+            # Optional: remove parentheses if your formatter ever adds them
+            formatted_amount = formatted_amount.strip("()")
+
+            display_value = f"{top_commodity_name} {formatted_amount}"
+
+        st.metric("**Top Commodity**", display_value)
 
     create_summary_table_vertical(
         metrics["df"], title, metrics["total_transactions"]
     )
     st.markdown("---")
     return metrics
-
 
 render_kpi_block("Today's Sales Performance", today, today)
 render_kpi_block("Last 7 Days Performance", last_7_days_start, today)
