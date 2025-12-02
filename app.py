@@ -97,57 +97,72 @@ def get_commodity_comparisons(exploded_df: pd.DataFrame, report_date: date) -> p
 
 
 def calculate_rank_movement(exploded_df: pd.DataFrame, report_date: date) -> pd.DataFrame:
-    """Calculates current YTD ranking and compares it to YTD ranking 30 days prior."""
+    """
+    Calculates current YTD ranking and compares it to YTD ranking 30 days prior.
+    This version is NaN safe and will not fail when converting to int.
+    """
     last_month_end_date = report_date - timedelta(days=30)
     start_of_year = date(report_date.year, 1, 1)
 
+    # YTD data up to report_date
     current_ytd = exploded_df[
         (exploded_df["date"] >= start_of_year) & (exploded_df["date"] <= report_date)
     ]
-    rank_current = (
-        current_ytd.groupby("commodity")["gross_amount_per_commodity"]
-        .sum()
-        .rank(method="min", ascending=False)
-        .astype(int)
-        .rename("Current Rank")
-    )
+    if current_ytd.empty:
+        return pd.DataFrame(columns=["commodity", "Amount", "Current Rank", "Rank Change"])
 
+    # Current ranks
+    current_totals = current_ytd.groupby("commodity")["gross_amount_per_commodity"].sum()
+    rank_current = current_totals.rank(method="min", ascending=False)
+
+    # Baseline YTD up to 30 days ago
     baseline_ytd = exploded_df[
         (exploded_df["date"] >= start_of_year) & (exploded_df["date"] <= last_month_end_date)
     ]
-    rank_baseline = (
-        baseline_ytd.groupby("commodity")["gross_amount_per_commodity"]
-        .sum()
-        .rank(method="min", ascending=False)
-        .astype(int)
-        .rename("Baseline Rank")
+    baseline_totals = baseline_ytd.groupby("commodity")["gross_amount_per_commodity"].sum()
+    rank_baseline = baseline_totals.rank(method="min", ascending=False)
+
+    # Align on commodity
+    rank_comparison = pd.concat(
+        [rank_current.rename("Current Rank"), rank_baseline.rename("Baseline Rank")],
+        axis=1,
     )
 
-    rank_comparison = pd.concat([rank_current, rank_baseline], axis=1)
-    rank_comparison["Movement"] = rank_comparison["Baseline Rank"] - rank_comparison["Current Rank"]
-
-    current_sales = (
-        current_ytd.groupby("commodity")["gross_amount_per_commodity"].sum().rename("Amount")
+    # If there was no baseline rank, treat baseline as current so movement starts at zero
+    rank_comparison["Baseline Rank"] = rank_comparison["Baseline Rank"].fillna(
+        rank_comparison["Current Rank"]
     )
+
+    # Now both columns are finite, safe to convert
+    rank_comparison["Current Rank"] = rank_comparison["Current Rank"].astype(int)
+    rank_comparison["Baseline Rank"] = rank_comparison["Baseline Rank"].astype(int)
+
+    # Movement: positive means it moved up the table
+    rank_comparison["Movement"] = (
+        rank_comparison["Baseline Rank"] - rank_comparison["Current Rank"]
+    )
+
+    # Sales for context
+    current_sales = current_totals.rename("Amount")
 
     final_df = pd.concat(
-        [current_sales, rank_current, rank_comparison["Movement"]], axis=1
+        [current_sales, rank_comparison["Current Rank"], rank_comparison["Movement"]],
+        axis=1,
     ).reset_index()
 
+    # Clean movement so we never try to cast NaN
+    movement_int = final_df["Movement"].fillna(0).astype(int)
+
     final_df["Movement Symbol"] = np.where(
-        final_df["Movement"] > 0,
-        "▲",
-        np.where(final_df["Movement"] < 0, "▼", "—"),
+        movement_int > 0, "▲",
+        np.where(movement_int < 0, "▼", "—"),
     )
 
-    final_df["Rank Change"] = final_df["Movement"].abs().astype(int).astype(str)
-    final_df.loc[final_df["Movement"] > 0, "Rank Change"] = (
-        "▲ " + final_df["Rank Change"]
+    final_df["Rank Change"] = np.where(
+        movement_int == 0,
+        "—",
+        final_df["Movement Symbol"] + " " + movement_int.abs().astype(str),
     )
-    final_df.loc[final_df["Movement"] < 0, "Rank Change"] = (
-        "▼ " + final_df["Rank Change"]
-    )
-    final_df.loc[final_df["Movement"] == 0, "Rank Change"] = "—"
 
     final_df = final_df.sort_values("Amount", ascending=False).head(10)
 
