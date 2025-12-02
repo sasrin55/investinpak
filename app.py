@@ -33,7 +33,7 @@ st.markdown("---")
 # 2. DATA LOADING AND CLEANUP
 # ==============================================================================
 
-@st.cache_data(show_spinner="Connecting to Data Source and Loading...")
+@st.cache_data(show_spinner="Connecting to Data Source and loading...")
 def load_data():
     """Reads data, renames columns, and cleans data types."""
     try:
@@ -114,14 +114,18 @@ def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
         mapping = {
             'cotton': 'Cotton', 'coton': 'Cotton', 'cottonmillet': 'Cotton Millet',
             'paddy': 'Paddy', 'padd': 'Paddy',
-            'wheat': 'Wheat', 'wheatandpaddy': 'Wheat & Paddy',
+            'wheat': 'Wheat', 
+            'wheatandpaddy': 'Wheat & Paddy',
             'edibleoil': 'Edible Oil',
             'fertilizer': 'Fertilizer', 
             'pulses': 'Pulses', 'daal': 'Pulses',
             'bajra': 'Bajra',
             'livestock': 'Livestock', 
             'sesame': 'Sesame', 
-            'sugar': 'Sugar', 'sugarwheat': 'Sugar + Wheat',
+            # ENHANCED SUGAR MAPPING:
+            'sugar': 'Sugar', 
+            'sugarsugar': 'Sugar', # Handles cases where 'Sugar, Sugar' becomes 'sugarsugar'
+            'sugarwheat': 'Sugar + Wheat',
             'mustard': 'Mustard', 'mustrad': 'Mustard',
             'kiryana': 'Kiryana',
             'dryfruits': 'Dry Fruits',
@@ -280,7 +284,7 @@ def create_summary_table_vertical(df, period_title, transactions_count):
     summary_df = summary_df.rename(columns={
         "customer_name": "Customer",
         "commodity": "Commodity",
-        "amount_per_commodity": AMOUNT_COL_NAME 
+        "amount_per_commodity": AMOUNT_COL_NAME # Use the calculated name
     })
     
     summary_df = summary_df.sort_values(AMOUNT_COL_NAME, ascending=False)
