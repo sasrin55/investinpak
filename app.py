@@ -21,7 +21,7 @@ st.markdown("Transaction and Commodity-level Sales Intelligence.")
 st.markdown("---")
 
 # ==============================================================================
-# 1. EMAIL HELPER FUNCTION DEFINITIONS (FIXED AND MOVED TO TOP)
+# 1. EMAIL HELPER FUNCTION DEFINITIONS (CRITICAL FIX: DEFINED AT THE TOP)
 # ==============================================================================
 
 def build_daily_email_html(report_date: date, metrics: dict):
@@ -29,7 +29,6 @@ def build_daily_email_html(report_date: date, metrics: dict):
     
     rows_html = ""
     # Get the top 5 commodities table data from the calculated metrics
-    # Using the DataFrame returned by get_kpi_metrics
     df = metrics["df"].groupby("commodity")["gross_amount_per_commodity"].sum().reset_index().sort_values("gross_amount_per_commodity", ascending=False).head(5)
     
     for _, row in df.iterrows():
@@ -84,7 +83,7 @@ def send_email_report(recipient_emails: list, report_date: date):
         st.error(f"SMTP credentials not found in st.secrets. Please configure SMTP_USER / SMTP_PASS. Details: {e}")
         return False
 
-    # FIX: Ensure raw_df_local and exploded_df_local are available for get_kpi_metrics
+    # FIX: Ensure data is loaded locally within this context
     try:
         raw_df_local = cached_load_data()
         exploded_df_local = explode_commodities(raw_df_local)
@@ -168,7 +167,7 @@ st.markdown("---")
 
 st.header("Email Report (On-Demand Sender)")
 
-st.caption("Enter a single email address to securely send today's summary report.")
+st.caption("Enter a single email address and send today's summary report.")
 
 col_email_input, col_email_button = st.columns([3, 1])
 
@@ -267,7 +266,7 @@ txn_count_by_customer_commodity["Buyer Type"] = np.where(
 loyalty_summary = (
     exploded_df.merge(txn_count_by_customer_commodity, on='customer_name', how='left')
     .groupby(["commodity", "Buyer Type"])
-    ["customer_name"].nunique()
+    ["customer_name"].nunique() # Count unique customers in each type
     .unstack(fill_value=0)
 )
 
