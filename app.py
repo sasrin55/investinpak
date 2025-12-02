@@ -180,19 +180,27 @@ if raw_df.empty:
 # Date Calculations
 today = date.today()
 
-# FIX: Robust date handling for st.date_input
-min_data_date = raw_df["date"].min()
-if isinstance(min_data_date, pd.Timestamp):
-    min_data_date = min_data_date.date()
-elif isinstance(min_data_date, np.datetime64):
-    min_data_date = pd.to_datetime(min_data_date).date()
+# --- FIX: Robust date handling for st.date_input ---
+raw_date_min = raw_df["date"].min()
+
+if pd.isna(raw_date_min):
+    # Fallback to the start of the current year if all dates are missing/invalid
+    min_data_date = date(today.year, 1, 1)
+    st.warning("All dates in your data appear invalid. Filtering is starting from Jan 1st of the current year.")
+elif isinstance(raw_date_min, pd.Timestamp):
+    min_data_date = raw_date_min.date()
+elif isinstance(raw_date_min, np.datetime64):
+    min_data_date = pd.to_datetime(raw_date_min).date()
+else:
+    min_data_date = raw_date_min
     
+# Max date handling (less likely to be the error source, but kept for consistency)
 max_data_date = raw_df["date"].max()
 if isinstance(max_data_date, pd.Timestamp):
     max_data_date = max_data_date.date()
 elif isinstance(max_data_date, np.datetime64):
     max_data_date = pd.to_datetime(max_data_date).date()
-
+# --- END FIX ---
 
 start_of_year = date(today.year, 1, 1)
 last_30_days_start = today - timedelta(days=29) # 30 days including today
@@ -202,10 +210,11 @@ last_30_days_start = today - timedelta(days=29) # 30 days including today
 st.subheader("Reporting Filters")
 filter_cols = st.columns([1, 4])
 
-# 1. Date range selector (Only filter remaining)
+# 1. Date range selector 
 with filter_cols[0]:
     date_range = st.date_input(
         "Reporting Period",
+        # Pass converted date objects
         value=(min_data_date, today),
         min_value=min_data_date,
         max_value=max_data_date,
