@@ -3,7 +3,7 @@
 import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
-from email.mime_text import MIMEText
+from email.mime.text import MIMEText  # <- correct import
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
 
@@ -240,24 +240,15 @@ def build_daily_email_html(
 # -------------------------------------------------------------------
 
 def get_recipients_from_env() -> list:
-    """
-    Read REPORT_RECIPIENT_EMAIL from env and turn into a clean list.
-    Falls back to your three default emails if the env var is missing.
-    """
+    """Read REPORT_RECIPIENT_EMAIL from env and turn into a clean list."""
     raw = os.environ.get("REPORT_RECIPIENT_EMAIL", "")
-    if not raw.strip():
-        return [
-            "abdul.raafey@zaraimandi.com",
-            "ghasharib.shoukat@gmail.com",
-            "raahimshoukat99@gmail.com",
-        ]
     parts = [p.strip() for p in raw.replace(";", ",").split(",") if p.strip()]
     return parts
 
 
 def send_email_report(report_date: date) -> None:
     """Load data, build metrics, and send the email using GitHub Actions env vars."""
-    # These names match your workflow: SMTP_USER / SMTP_PASS / SMTP_SERVER / SMTP_PORT
+    # These match your workflow (SMTP_USER / SMTP_PASS)
     smtp_user = os.environ["SMTP_USER"]
     smtp_pass = os.environ["SMTP_PASS"]
     smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
@@ -265,13 +256,11 @@ def send_email_report(report_date: date) -> None:
 
     recipients = get_recipients_from_env()
     if not recipients:
-        raise RuntimeError("No recipients found in REPORT_RECIPIENT_EMAIL or fallback list.")
+        raise RuntimeError("No recipients found in REPORT_RECIPIENT_EMAIL.")
 
-    # Load data
     raw_df = load_data(use_cache=False)
     exploded_df = explode_commodities(raw_df)
 
-    # Metrics
     today_metrics = get_kpi_metrics(raw_df, exploded_df, report_date, report_date)
     last_7_metrics = get_kpi_metrics(
         raw_df, exploded_df, report_date - timedelta(days=6), report_date
@@ -287,7 +276,6 @@ def send_email_report(report_date: date) -> None:
         report_date, today_metrics, last_7_metrics, ytd_metrics, trend_df, rank_df
     )
 
-    # Compose and send
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"Zaraimandi Daily Sales Report – {report_date}"
     msg["From"] = smtp_user
@@ -300,7 +288,6 @@ def send_email_report(report_date: date) -> None:
 
 
 def main():
-    # Use Pakistan time for the report date
     report_date = datetime.now(ZoneInfo("Asia/Karachi")).date()
     send_email_report(report_date)
 
