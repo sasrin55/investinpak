@@ -180,27 +180,39 @@ if raw_df.empty:
 # Date Calculations
 today = date.today()
 
-# --- FIX: Robust date handling for st.date_input ---
+# --- FIX: Robust date handling for st.date_input (Type and NaN/NaT checking) ---
 raw_date_min = raw_df["date"].min()
 
-if pd.isna(raw_date_min):
-    # Fallback to the start of the current year if all dates are missing/invalid
+# Determine initial min_data_date, falling back to Jan 1st if missing
+if pd.isna(raw_date_min) or raw_date_min is pd.NaT:
     min_data_date = date(today.year, 1, 1)
-    st.warning("All dates in your data appear invalid. Filtering is starting from Jan 1st of the current year.")
-elif isinstance(raw_date_min, pd.Timestamp):
-    min_data_date = raw_date_min.date()
-elif isinstance(raw_date_min, np.datetime64):
-    min_data_date = pd.to_datetime(raw_date_min).date()
 else:
-    min_data_date = raw_date_min
-    
-# Max date handling (less likely to be the error source, but kept for consistency)
+    if isinstance(raw_date_min, pd.Timestamp):
+        min_data_date = raw_date_min.date()
+    elif isinstance(raw_date_min, np.datetime64):
+        min_data_date = pd.to_datetime(raw_date_min).date()
+    else:
+        min_data_date = raw_date_min # Already a date object
+
 max_data_date = raw_df["date"].max()
-if isinstance(max_data_date, pd.Timestamp):
-    max_data_date = max_data_date.date()
-elif isinstance(max_data_date, np.datetime64):
-    max_data_date = pd.to_datetime(max_data_date).date()
+if pd.isna(max_data_date) or max_data_date is pd.NaT:
+    max_data_date = today
+else:
+    if isinstance(max_data_date, pd.Timestamp):
+        max_data_date = max_data_date.date()
+    elif isinstance(max_data_date, np.datetime64):
+        max_data_date = pd.to_datetime(max_data_date).date()
+    else:
+        max_data_date = max_data_date
+
+# --- CRITICAL FAIL-SAFE FOR RANGE CONFLICT ---
+# Ensure min_value is never greater than max_value or today
+if min_data_date > max_data_date:
+    min_data_date = max_data_date
+if min_data_date > today:
+    min_data_date = today
 # --- END FIX ---
+
 
 start_of_year = date(today.year, 1, 1)
 last_30_days_start = today - timedelta(days=29) # 30 days including today
@@ -327,7 +339,7 @@ st.markdown("Analyzes commodity performance based on the count of unique **New**
 txn_count_by_customer_commodity = (
     exploded_df.groupby(["customer_name", "commodity"])["date"].nunique().reset_index()
 )
-txn_count_by_customer_commodity.rename(columns={"date": "Transaction Count"}, inplace=True)
+txn_count_by_customer_commodity.rename(columns={"date": "Total Transactions"}, inplace=True)
 
 # 2. Determine Buyer Type (New vs. Repeat) for each customer-commodity pair
 # A buyer is 'Repeat' if their Transaction Count for that commodity > 1.
