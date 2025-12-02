@@ -32,18 +32,20 @@ st.markdown("Transaction and Commodity-level Sales Intelligence.")
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# EMAIL HELPERS (ADVANCED VERSION ONLY)
+# EMAIL HELPERS AND DATA CACHE
 # -----------------------------------------------------------------------------
 
 @st.cache_data(ttl=300, show_spinner="Connecting to Google Sheet and loading...")
 def cached_load_data():
-    """Load data from Google Sheets and remember when it was refreshed.
+    """
+    Load data from Google Sheets and remember when it was refreshed.
 
     ttl=300 means Streamlit will reload from the Sheet at most every 5 minutes.
     """
     df = load_data(use_cache=False)
     refreshed_at = datetime.now(ZoneInfo("Asia/Karachi"))
     return df, refreshed_at
+
 
 def get_commodity_comparisons(exploded_df: pd.DataFrame, report_date: date) -> pd.DataFrame:
     """Calculates WoW and MoM change percentages for the top commodities."""
@@ -55,18 +57,10 @@ def get_commodity_comparisons(exploded_df: pd.DataFrame, report_date: date) -> p
     mask_current_30 = (exploded_df["date"] >= previous_30_start) & (exploded_df["date"] <= report_date)
     df_base = exploded_df.loc[mask_current_30]
 
-    sales_current_week = df_base[
-        (df_base["date"] >= current_7_start) & (df_base["date"] <= report_date)
-    ]
-    sales_current_month = df_base[
-        (df_base["date"] >= current_30_start) & (df_base["date"] <= report_date)
-    ]
-    sales_previous_week = df_base[
-        (df_base["date"] >= previous_7_start) & (df_base["date"] < current_7_start)
-    ]
-    sales_previous_month = df_base[
-        (df_base["date"] >= previous_30_start) & (df_base["date"] < current_30_start)
-    ]
+    sales_current_week = df_base[(df_base["date"] >= current_7_start) & (df_base["date"] <= report_date)]
+    sales_current_month = df_base[(df_base["date"] >= current_30_start) & (df_base["date"] <= report_date)]
+    sales_previous_week = df_base[(df_base["date"] >= previous_7_start) & (df_base["date"] < current_7_start)]
+    sales_previous_month = df_base[(df_base["date"] >= previous_30_start) & (df_base["date"] < current_30_start)]
 
     agg_sales = lambda df: df.groupby("commodity")["gross_amount_per_commodity"].sum()
 
@@ -104,50 +98,43 @@ def get_commodity_comparisons(exploded_df: pd.DataFrame, report_date: date) -> p
 def calculate_rank_movement(exploded_df: pd.DataFrame, report_date: date) -> pd.DataFrame:
     """
     Calculates current YTD ranking and compares it to YTD ranking 30 days prior.
-    This version is NaN safe and will not fail when converting to int.
+    NaN safe.
     """
     last_month_end_date = report_date - timedelta(days=30)
     start_of_year = date(report_date.year, 1, 1)
 
-    # YTD data up to report_date
     current_ytd = exploded_df[
         (exploded_df["date"] >= start_of_year) & (exploded_df["date"] <= report_date)
     ]
     if current_ytd.empty:
         return pd.DataFrame(columns=["commodity", "Amount", "Current Rank", "Rank Change"])
 
-    # Current ranks
     current_totals = current_ytd.groupby("commodity")["gross_amount_per_commodity"].sum()
     rank_current = current_totals.rank(method="min", ascending=False)
 
-    # Baseline YTD up to 30 days ago
     baseline_ytd = exploded_df[
         (exploded_df["date"] >= start_of_year) & (exploded_df["date"] <= last_month_end_date)
     ]
     baseline_totals = baseline_ytd.groupby("commodity")["gross_amount_per_commodity"].sum()
     rank_baseline = baseline_totals.rank(method="min", ascending=False)
 
-    # Align on commodity
     rank_comparison = pd.concat(
         [rank_current.rename("Current Rank"), rank_baseline.rename("Baseline Rank")],
         axis=1,
     )
 
-    # If there was no baseline rank, treat baseline as current so movement starts at zero
+    # If there was no baseline rank, start baseline at current so movement = 0
     rank_comparison["Baseline Rank"] = rank_comparison["Baseline Rank"].fillna(
         rank_comparison["Current Rank"]
     )
 
-    # Now both columns are finite, safe to convert
     rank_comparison["Current Rank"] = rank_comparison["Current Rank"].astype(int)
     rank_comparison["Baseline Rank"] = rank_comparison["Baseline Rank"].astype(int)
 
-    # Movement: positive means it moved up the table
     rank_comparison["Movement"] = (
         rank_comparison["Baseline Rank"] - rank_comparison["Current Rank"]
     )
 
-    # Sales for context
     current_sales = current_totals.rename("Amount")
 
     final_df = pd.concat(
@@ -155,7 +142,6 @@ def calculate_rank_movement(exploded_df: pd.DataFrame, report_date: date) -> pd.
         axis=1,
     ).reset_index()
 
-    # Clean movement so we never try to cast NaN
     movement_int = final_df["Movement"].fillna(0).astype(int)
 
     final_df["Movement Symbol"] = np.where(
@@ -182,7 +168,7 @@ def build_daily_email_html(
     trend_df: pd.DataFrame,
     rank_df: pd.DataFrame,
 ) -> str:
-    """Builds the HTML body for the daily email."""
+    """Build the HTML body for the daily email."""
     today_sales = today_metrics["total_amount"]
     last_7_total = last_7_metrics["total_amount"]
     last_7_avg = last_7_total / 7 if last_7_total else 0
@@ -195,14 +181,11 @@ def build_daily_email_html(
             f"than the average of the last 7 days."
         )
     else:
-        change_text = (
-            "Not enough sales data in the last week for a meaningful comparison."
-        )
+        change_text = "Not enough sales data in the last week for a meaningful comparison."
 
     top_commodity = today_metrics["top_commodity_name"]
     top_commodity_amount = today_metrics["top_commodity_amount"]
 
-    # Trend table
     trend_rows_html = ""
     for _, row in trend_df.iterrows():
         wow_style = "color:#006B3F;" if row["WoW Change %"] >= 0 else "color:#CC0000;"
@@ -216,7 +199,6 @@ def build_daily_email_html(
         </tr>
         """
 
-    # Rank movement table
     rank_rows_html = ""
     for _, row in rank_df.iterrows():
         rank_rows_html += f"""
@@ -265,14 +247,13 @@ def build_daily_email_html(
             {rank_rows_html}
         </table>
 
-    <p style="margin-top:18px;">
-    <a href="https://zmsales.streamlit.app/"
-       target="_blank"
-       style="font-size:14px; text-decoration:none; color:#1a73e8;">
-       Open Full Interactive Dashboard
-    </a>
-</p>
-      
+        <p style="margin-top:18px;">
+            <a href="https://zmsales.streamlit.app/"
+               target="_blank"
+               style="font-size:14px; text-decoration:none; color:#1a73e8;">
+               Open Full Interactive Dashboard
+            </a>
+        </p>
     </body>
     </html>
     """
@@ -293,7 +274,7 @@ def send_email_report(recipient_emails: list, report_date: date) -> bool:
         return False
 
     try:
-        raw_df_local = cached_load_data()
+        raw_df_local, _ = cached_load_data()
         exploded_df_local = explode_commodities(raw_df_local)
 
         today_metrics = get_kpi_metrics(
@@ -335,16 +316,26 @@ def send_email_report(recipient_emails: list, report_date: date) -> bool:
         st.error(f"Error sending email: {e}")
         return False
 
-
 # -----------------------------------------------------------------------------
-# LOAD DATA
+# LOAD DATA WITH REFRESH BUTTON
 # -----------------------------------------------------------------------------
 
-raw_df = cached_load_data()
+refresh_col, _ = st.columns([1, 4])
+with refresh_col:
+    if st.button("Refresh data from Google Sheet"):
+        cached_load_data.clear()
+        st.experimental_rerun()
+
+raw_df, refreshed_at = cached_load_data()
 exploded_df = explode_commodities(raw_df)
 
 if raw_df.empty:
     st.stop()
+
+st.caption(
+    f"Data last refreshed at {refreshed_at.strftime('%Y-%m-%d %H:%M %Z')} "
+    f"(auto refresh every 5 minutes or use the Refresh button above)."
+)
 
 today = date.today()
 start_of_year = date(today.year, 1, 1)
@@ -396,7 +387,7 @@ if raw_df_filtered.empty or exploded_df_filtered.empty:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# EMAIL SECTION (ON-DEMAND)
+# EMAIL SECTION (ON DEMAND)
 # -----------------------------------------------------------------------------
 
 st.header("Email Report (On-Demand Sender)")
@@ -520,9 +511,7 @@ if "Repeat" not in loyalty_summary.columns:
     loyalty_summary["Repeat"] = 0
 
 loyalty_summary = loyalty_summary[["Repeat", "New"]]
-loyalty_summary["Total Buyers"] = (
-    loyalty_summary["Repeat"] + loyalty_summary["New"]
-)
+loyalty_summary["Total Buyers"] = loyalty_summary["Repeat"] + loyalty_summary["New"]
 
 loyalty_summary = loyalty_summary.reset_index()
 loyalty_summary = loyalty_summary.sort_values("Repeat", ascending=False)
