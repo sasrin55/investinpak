@@ -23,11 +23,11 @@ from report_utils import (
 # PAGE CONFIG
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Zarai Mandi Sales Dashboard", # Corrected Name
+    page_title="Zarai Mandi Sales Dashboard",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-st.title("Zarai Mandi Sales Dashboard") # Corrected Name
+st.title("Zarai Mandi Sales Dashboard")
 st.markdown("Transaction and Commodity-level Sales Intelligence.")
 st.markdown("---")
 
@@ -213,7 +213,8 @@ def build_daily_email_html(
     html = f"""
     <html>
     <body style="font-family:Arial, sans-serif; font-size:14px;">
-        <h2>Zarai Mandi Daily Report – {report_date}</h2> <p>This report summarizes the day's gross sales activity with context vs recent performance.</p>
+        <h2>Zarai Mandi Daily Report – {report_date}</h2>
+        <p>This report summarizes the day's gross sales activity with context vs recent performance.</p>
 
         <ul>
             <li><b>Total sales:</b> {metric_format(today_metrics["total_amount"])}</li>
@@ -301,7 +302,7 @@ def send_email_report(recipient_emails: list, report_date: date) -> bool:
     )
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"[V2] Zarai Mandi Daily Sales Report – {report_date}" # Corrected Name
+    msg["Subject"] = f"[V2] Zarai Mandi Daily Sales Report – {report_date}"
     msg["From"] = smtp_user
     msg["To"] = ", ".join(recipient_emails)
     msg.attach(MIMEText(html_body, "html"))
@@ -323,7 +324,7 @@ refresh_col, _ = st.columns([1, 4])
 with refresh_col:
     if st.button("Refresh data from Google Sheet"):
         cached_load_data.clear()
-        st.experimental_rerun()
+        st.rerun() # CORRECTED: Changed st.experimental_rerun() to st.rerun()
 
 raw_df, refreshed_at = cached_load_data()
 exploded_df = explode_commodities(raw_df)
@@ -460,7 +461,6 @@ def render_kpi_block(title, start_date, end_date):
     with col3:
         st.metric("**Unique Customers**", metrics["unique_customers"])
     with col4:
-        # This section is the likely source of the Value/TypeErrors experienced before
         st.metric(
             "**Top Commodity**",
             f"{metrics['top_commodity_name']} ({metrics['top_commodity_amount']})",
