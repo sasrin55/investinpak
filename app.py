@@ -24,8 +24,8 @@ st.set_page_config(
 )
 
 # --- Title and Header ---
-st.title("Zaraimandi Sales Dashboard (Gross Sales)")
-st.markdown("Transaction and Commodity-level Gross Sales Intelligence.")
+st.title("Zaraimandi Sales Dashboard")
+st.markdown("Transaction and Commodity-level Sales Intelligence.")
 st.markdown("---")
 
 
@@ -61,9 +61,7 @@ def load_data():
     df["customer_name"] = df["customer_name"].astype(str).str.strip()
     df = df.dropna(subset=["date"])
 
-    # NOTE: Net amount calculation removed. We use amount_pkr for Gross Sales.
-    df['net_amount'] = df['amount_pkr'] # Kept for simplicity, though amounts are now always positive/gross
-
+    # We only use amount_pkr (gross) for all totals
     return df
 
 
@@ -160,10 +158,10 @@ def explode_commodities(base_df: pd.DataFrame) -> pd.DataFrame:
     return temp[["date", "customer_name", "txn_type", "commodity", "gross_amount_per_commodity", "amount_pkr"]]
 
 
-# --- MODIFIED: Sum function now uses 'amount_pkr' (Gross Sales) ---
 def sum_between(df, start, end, amount_col="amount_pkr"):
     """Calculates the GROSS sum of amount between two dates (inclusive)."""
     mask = (df["date"] >= start) & (df["date"] <= end)
+    # FIX: Ensure this always sums the gross column
     return df.loc[mask, amount_col].sum()
 
 def count_transactions(df, start, end):
@@ -252,22 +250,24 @@ def metric_format(value):
 def get_kpi_metrics(start_date, end_date):
     """Calculates all metrics and returns the filtered exploded DataFrame for a period."""
     
+    # FIX: Calculate Total Amount directly from RAW data (amount_pkr) for Gross Sum accuracy
+    raw_period_mask = (raw_df["date"] >= start_date) & (raw_df["date"] <= end_date)
+    total_amount = raw_df.loc[raw_period_mask, "amount_pkr"].sum()
+
     period_mask = (exploded_df["date"] >= start_date) & (exploded_df["date"] <= end_date)
     period_df = exploded_df.loc[period_mask].copy()
 
-    # NOTE: Using gross_amount_per_commodity for accurate gross sales totals
-    total_amount = period_df["gross_amount_per_commodity"].sum()
     total_transactions = count_transactions(raw_df, start_date, end_date)
     unique_customers = period_df["customer_name"].nunique()
 
-    # Calculate Top Commodity (based on GROSS amount)
+    # Calculate Top Commodity (based on GROSS amount per commodity)
     top_commodity_series = period_df.groupby("commodity")["gross_amount_per_commodity"].sum().nlargest(1)
     top_commodity_name = top_commodity_series.index[0] if not top_commodity_series.empty else "N/A"
     top_commodity_amount = metric_format(top_commodity_series.iloc[0]) if not top_commodity_series.empty else "N/A"
 
     return {
         "df": period_df,
-        "total_amount": total_amount,
+        "total_amount": total_amount, # Uses direct RAW sum
         "total_transactions": total_transactions,
         "unique_customers": unique_customers,
         "top_commodity_name": top_commodity_name,
@@ -453,7 +453,7 @@ st.markdown("---")
 
 
 # ==============================================================================
-# 6. COMMODITY SEASONALITY
+# 6. COMMODITY SEASONALITY (Functions remain the same)
 # ==============================================================================
 
 st.header("Commodity Seasonality Analysis")
@@ -571,7 +571,7 @@ data_choice = st.selectbox(
 if data_choice == "Raw Transactions (Total Amount)":
     st.subheader("Raw Transaction Data")
     # Display the Gross Amount column
-    df_display = raw_df_filtered.sort_values("date", ascending=False).drop(columns=['phone', 'net_amount'], errors='ignore')
+    df_display = raw_df_filtered.sort_values("date", ascending=False).drop(columns=['phone'], errors='ignore')
     
     # Rename column for display clarity
     df_display.rename(columns={'amount_pkr': f'Gross Amount ({CURRENCY_CODE})'}, inplace=True)
