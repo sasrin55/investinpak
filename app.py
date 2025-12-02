@@ -179,8 +179,20 @@ if raw_df.empty:
 
 # Date Calculations
 today = date.today()
+
+# FIX: Robust date handling for st.date_input
 min_data_date = raw_df["date"].min()
+if isinstance(min_data_date, pd.Timestamp):
+    min_data_date = min_data_date.date()
+elif isinstance(min_data_date, np.datetime64):
+    min_data_date = pd.to_datetime(min_data_date).date()
+    
 max_data_date = raw_df["date"].max()
+if isinstance(max_data_date, pd.Timestamp):
+    max_data_date = max_data_date.date()
+elif isinstance(max_data_date, np.datetime64):
+    max_data_date = pd.to_datetime(max_data_date).date()
+
 
 start_of_year = date(today.year, 1, 1)
 last_30_days_start = today - timedelta(days=29) # 30 days including today
@@ -296,7 +308,7 @@ with col_ytd_tables:
 st.markdown("---")
 
 # ==============================================================================
-# 5. REPEAT CUSTOMERS BY COMMODITY (MODIFIED FOR COMMODITY COUNT)
+# 5. COMMODITY LOYALTY (New vs. Repeat Count)
 # ==============================================================================
 
 st.header("Commodity Loyalty Analysis")
