@@ -21,29 +21,21 @@ from report_utils import (
 # -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
-# PAGE CONFIG (AESTHETICS - DARK MODE AND CLEANER FONT)
+# PAGE CONFIG 
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Zaraimandi Sales Dashboard",
+    page_title="Zarai Mandi Sales Dashboard", # CORRECTED SPELLING HERE
     layout="wide",
     initial_sidebar_state="collapsed",
-    # Setting theme for a professional, dark aesthetic (like HockeyStack)
-    theme={
-        "primaryColor": "#007BFF",  # A clean blue accent color
-        "backgroundColor": "#1E202A",  # Dark gray background
-        "secondaryBackgroundColor": "#282A3A",  # Slightly lighter card background
-        "textColor": "#F0F2F6",
-        "font": "sans serif",
-    },
 )
 
-st.title("💰 Zaraimandi Sales Dashboard")
+st.title("💰 Zarai Mandi Sales Dashboard") # CORRECTED SPELLING HERE
 st.markdown("**Transaction and Commodity-level Sales Intelligence.**")
 st.markdown("---")
 
 
 # -----------------------------------------------------------------------------
-# EMAIL HELPERS AND DATA CACHE (Re-included for completeness)
+# EMAIL HELPERS AND DATA CACHE 
 # -----------------------------------------------------------------------------
 
 @st.cache_data(ttl=300, show_spinner="Connecting to Google Sheet and loading...")
@@ -51,9 +43,7 @@ def cached_load_data():
     """
     Load data from Google Sheets and remember when it was refreshed.
     """
-    # NOTE: load_data must be defined in report_utils
     df = load_data(use_cache=False)
-    # Use Pakistan time for context
     refreshed_at = datetime.now(ZoneInfo("Asia/Karachi"))
     return df, refreshed_at
 
@@ -223,8 +213,7 @@ def build_daily_email_html(
     html = f"""
     <html>
     <body style="font-family:Arial, sans-serif; font-size:14px;">
-        <h2>Zaraimandi Daily Report – {report_date}</h2>
-        <p>This report summarizes the day's gross sales activity with context vs recent performance.</p>
+        <h2>Zarai Mandi Daily Report – {report_date}</h2> <p>This report summarizes the day's gross sales activity with context vs recent performance.</p>
 
         <ul>
             <li><b>Total sales:</b> {metric_format(today_metrics["total_amount"])}</li>
@@ -273,7 +262,6 @@ def build_daily_email_html(
 def send_email_report(recipient_emails: List[str], report_date: date) -> bool:
     """Send the HTML report email to multiple recipients using st.secrets."""
     try:
-        # NOTE: SMTP_USER/PASS must be configured in Streamlit secrets or GitHub secrets
         smtp_user = st.secrets["SMTP_USER"]
         smtp_pass = st.secrets["SMTP_PASS"]
         smtp_server = st.secrets.get("SMTP_SERVER", "smtp.gmail.com")
@@ -286,10 +274,8 @@ def send_email_report(recipient_emails: List[str], report_date: date) -> bool:
 
     try:
         raw_df_local, _ = cached_load_data()
-        # NOTE: explode_commodities must be defined in report_utils
         exploded_df_local = explode_commodities(raw_df_local)
 
-        # NOTE: get_kpi_metrics must be defined in report_utils
         today_metrics = get_kpi_metrics(
             raw_df_local, exploded_df_local, report_date, report_date
         )
@@ -315,7 +301,7 @@ def send_email_report(recipient_emails: List[str], report_date: date) -> bool:
     )
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"[V2] Zaraimandi Daily Sales Report – {report_date}"
+    msg["Subject"] = f"[V2] Zarai Mandi Daily Sales Report – {report_date}" # CORRECTED SPELLING HERE
     msg["From"] = smtp_user
     msg["To"] = ", ".join(recipient_emails)
     msg.attach(MIMEText(html_body, "html"))
@@ -330,7 +316,7 @@ def send_email_report(recipient_emails: List[str], report_date: date) -> bool:
         return False
 
 # -----------------------------------------------------------------------------
-# CUSTOM KPI CARD FUNCTION (HockeyStack Aesthetic)
+# CUSTOM KPI CARD FUNCTION 
 # -----------------------------------------------------------------------------
 
 def st_kpi_card(
@@ -358,9 +344,7 @@ def st_kpi_card(
         else:
             delta_color = "off"
 
-    # Apply currency format only if specified
     if value_format == "currency":
-        # NOTE: metric_format must be defined in report_utils
         value_str = metric_format(current_value)
     elif value_format == "int":
         value_str = f"{current_value:,.0f}"
@@ -380,12 +364,12 @@ def st_kpi_card(
 
 refresh_col, _ = st.columns([1, 4])
 with refresh_col:
+    # This logic is safe and clears the cache before rerunning
     if st.button("Refresh data from Google Sheet"):
         cached_load_data.clear()
         st.rerun()
 
 raw_df, refreshed_at = cached_load_data()
-# NOTE: explode_commodities must be defined in report_utils
 exploded_df = explode_commodities(raw_df)
 
 if raw_df.empty:
@@ -490,7 +474,6 @@ st.markdown("---")
 st.header("📈 Last 30 Days Performance")
 
 # 1. Calculate the metrics for the current period (Last 30 Days)
-# NOTE: get_kpi_metrics must be defined in report_utils
 current_metrics = get_kpi_metrics(raw_df, exploded_df, last_30_days_start, today)
 # 2. Calculate the metrics for the comparison period (Prior 30 Days)
 prior_30_days_end = last_30_days_start - timedelta(days=1)
@@ -561,7 +544,7 @@ daily_sales_df = (
 if not daily_sales_df.empty:
     daily_chart = (
         alt.Chart(daily_sales_df)
-        .mark_line(point=True, color="#007BFF") # Use the accent color
+        .mark_line(point=True, color="#007BFF") # Use a default blue accent
         .encode(
             x=alt.X("date:T", title="Date"),
             y=alt.Y("Total Sales:Q", title=f"Total Sales ({CURRENCY_CODE})", axis=alt.Axis(format=CURRENCY_FORMAT)),
@@ -612,7 +595,7 @@ with col_chart:
 
     chart_bar = (
         alt.Chart(top_commodity_summary)
-        .mark_bar(color="#007BFF") # Use the accent color
+        .mark_bar(color="#007BFF") # Use a default blue accent
         .encode(
             x=alt.X(
                 "Amount:Q",
@@ -647,7 +630,7 @@ with col_table:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# LOYALTY, SEASONALITY, DATA EXPLORER (Minimal cleanup/refactoring)
+# LOYALTY, SEASONALITY, DATA EXPLORER
 # -----------------------------------------------------------------------------
 
 st.header("👥 Commodity Loyalty Analysis")
