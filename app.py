@@ -324,7 +324,7 @@ refresh_col, _ = st.columns([1, 4])
 with refresh_col:
     if st.button("Refresh data from Google Sheet"):
         cached_load_data.clear()
-        st.rerun() # FIXED: Changed deprecated st.experimental_rerun() to st.rerun()
+        st.rerun() # FIXED: Changed st.experimental_rerun() to st.rerun()
 
 raw_df, refreshed_at = cached_load_data()
 exploded_df = explode_commodities(raw_df)
@@ -435,39 +435,23 @@ def create_summary_table_vertical(df, period_title, transactions_count):
     # RENAME COLUMNS: Improving Grammar/Labels
     summary_df = summary_df.rename(
         columns={
-            "customer_name": "Customer Name", # Changed 'Customer' to 'Customer Name'
+            "customer_name": "Customer Name", # Grammar/Clarity fix
             "commodity": "Commodity",
             "gross_amount_per_commodity": AMOUNT_COL_NAME,
         }
     )
     summary_df = summary_df.sort_values(AMOUNT_COL_NAME, ascending=False)
     
-    # NEW: Using st.dataframe for a cleaner look and removing table styling
+    # NEW SUBHEADER: Removing parentheses and using cleaner text
+    st.subheader(f"Detailed Breakdown: Total Transactions {transactions_count}") 
     
-    # 1. Formatting for display
-    def format_currency_amount(val):
-        """Formats currency safely, removing need for complex HTML styling."""
-        if pd.notna(val):
-            return f"{CURRENCY_CODE} {val:,.0f}"
-        return ""
-
-    # 2. Creating a dictionary for column display configuration
-    column_config = {
-        AMOUNT_COL_NAME: st.column_config.TextColumn(
-            f"Amount {CURRENCY_CODE}",
-            format=f"{CURRENCY_CODE} %f" # Simpler default format; relies on metric_format elsewhere
-        )
-    }
-
-    st.subheader(f"Detailed Breakdown: Total Transactions {transactions_count}") # Removing parentheses
     with st.container(border=True):
         st.dataframe(
             summary_df,
             use_container_width=True,
             hide_index=True,
             height=500,
-            # We skip the complex .style.format() which can cause issues,
-            # relying on clean data and st.dataframe's modern styling.
+            # Cooler Table: Using st.column_config for modern number formatting
             column_config={
                 AMOUNT_COL_NAME: st.column_config.NumberColumn(
                     f"Amount ({CURRENCY_CODE})",
@@ -489,13 +473,22 @@ def render_kpi_block(title, start_date, end_date):
     with col3:
         st.metric("**Unique Customers**", metrics["unique_customers"])
     with col4:
-        # CLEANUP: Removing parentheses around the commodity metrics
         top_commodity_name = metrics['top_commodity_name']
-        top_commodity_amount_formatted = metric_format(metrics['top_commodity_amount']).strip('()')
+        top_commodity_amount = metrics['top_commodity_amount']
         
+        # FINAL STABILIZING FIX: Safely check and format amount
+        # Ensure the value is not None/NaN before formatting.
+        if top_commodity_amount is not None and top_commodity_amount != 0:
+            # Use metric_format and strip any default parentheses
+            # This relies on metric_format outputting "(PKR 1,234)" which .strip() removes
+            formatted_amount = metric_format(top_commodity_amount).strip('()')
+            display_value = f"{top_commodity_name} {formatted_amount}"
+        else:
+            display_value = "N/A (No Sales)"
+            
         st.metric(
             "**Top Commodity**",
-            f"{top_commodity_name} {top_commodity_amount_formatted}", # Combining for cleaner display
+            display_value,
         )
 
     create_summary_table_vertical(
@@ -671,7 +664,7 @@ with col_chart:
 
 with col_table:
     st.subheader("Summary Table")
-    # NEW: Using st.dataframe for cleaner display with custom formatting
+    # Cooler Table: Using st.dataframe for cleaner display with custom formatting
     st.dataframe(
         commodity_summary,
         use_container_width=True,
