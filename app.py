@@ -260,9 +260,14 @@ def build_daily_email_html(
             {rank_rows_html}
         </table>
 
-        <p style="margin-top:18px;">
-            <a href="YOUR_STREAMLIT_APP_URL_HERE" target="_blank">Open Full Interactive Dashboard</a>
-        </p>
+    <p style="margin-top:18px;">
+    <a href="https://zmsales.streamlit.app/"
+       target="_blank"
+       style="font-size:14px; text-decoration:none; color:#1a73e8;">
+       Open Full Interactive Dashboard
+    </a>
+</p>
+      
     </body>
     </html>
     """
