@@ -235,7 +235,7 @@ st.markdown("---")
 
 
 # ==============================================================================
-# 4. KEY PERFORMANCE INDICATORS (KPIs) - STRUCTURED TABLES
+# 4. KEY PERFORMANCE INDICATORS (KPIs) - RESTRUCTURED VERTICAL SECTIONS
 # ==============================================================================
 
 st.header("Key Performance Indicators (KPIs)")
@@ -243,89 +243,148 @@ st.header("Key Performance Indicators (KPIs)")
 def metric_format(value):
     return f"{CURRENCY_CODE} {value:,.0f}"
 
-## KPI Section 1: Detailed Transaction Summaries
+# --- NEW HELPER FUNCTIONS FOR VERTICAL KPI ---
 
-def create_summary_table(df, period_start, period_end, title):
-    """Generates a detailed table showing Customer, Commodity, and Amount for a period."""
+def get_kpi_metrics(start_date, end_date):
+    """Calculates all metrics and returns the filtered exploded DataFrame for a period."""
+    
+    period_mask = (exploded_df["date"] >= start_date) & (exploded_df["date"] <= end_date)
+    period_df = exploded_df.loc[period_mask].copy()
+
+    total_amount = period_df["amount_per_commodity"].sum()
+    total_transactions = count_transactions(raw_df, start_date, end_date)
+    unique_customers = period_df["customer_name"].nunique()
+
+    # Calculate Top Commodity
+    top_commodity_series = period_df.groupby("commodity")["amount_per_commodity"].sum().nlargest(1)
+    top_commodity_name = top_commodity_series.index[0] if not top_commodity_series.empty else "N/A"
+    top_commodity_amount = metric_format(top_commodity_series.iloc[0]) if not top_commodity_series.empty else "N/A"
+
+    return {
+        "df": period_df,
+        "total_amount": total_amount,
+        "total_transactions": total_transactions,
+        "unique_customers": unique_customers,
+        "top_commodity_name": top_commodity_name,
+        "top_commodity_amount": top_commodity_amount
+    }
+
+def create_summary_table_vertical(df, period_title, transactions_count):
+    """Generates the detailed table for the vertical sections."""
     
     AMOUNT_COL_NAME = f"Amount ({CURRENCY_CODE})"
 
-    # Filter the exploded data for the specific period
-    period_mask = (df["date"] >= period_start) & (df["date"] <= period_end)
-    summary_df = exploded_df.loc[period_mask].copy()
-    
     # Group by customer and commodity to summarize the transaction amount
-    summary_df = summary_df.groupby(["customer_name", "commodity"])["amount_per_commodity"].sum().reset_index()
+    summary_df = df.groupby(["customer_name", "commodity"])["amount_per_commodity"].sum().reset_index()
     
     summary_df = summary_df.rename(columns={
         "customer_name": "Customer",
         "commodity": "Commodity",
-        "amount_per_commodity": AMOUNT_COL_NAME # Use the calculated name
+        "amount_per_commodity": AMOUNT_COL_NAME 
     })
     
-    # Sort and format the output
     summary_df = summary_df.sort_values(AMOUNT_COL_NAME, ascending=False)
     
-    # Apply styling for better presentation
     styled_df = summary_df.style.format({
         AMOUNT_COL_NAME: f"{CURRENCY_CODE} {{:,.0f}}",
     })
-
-    st.subheader(f"{title} (Total Transactions: {count_transactions(raw_df, period_start, period_end)})")
+    
+    st.subheader(f"Detailed Breakdown (Total Transactions: {transactions_count})")
     
     # Use st.container to ensure the table sits nicely in the column
     with st.container(border=True):
-        # FIX: Added height parameter to prevent internal scrolling in tight columns
+        # Increased height to eliminate internal scrolling
         st.dataframe(styled_df, use_container_width=True, hide_index=True, height=500)
 
 
-col_today, col_7days, col_30days, col_ytd_tables = st.columns(4) # New 4-column layout
+# --- RENDER ALL KPI SECTIONS VERTICALLY ---
 
-# 1. SALES TODAY
-with col_today:
-    # Today Amount Metric
-    st.subheader("Today's Total Sales")
-    
-    # FIX: Force the use of the server's calendar date for "Today"
-    today_sales_date = today 
-    today_amount = sum_between(raw_df, today_sales_date, today_sales_date)
-    st.metric(f"**Total Sales ({today_sales_date.strftime('%b %d')})**", metric_format(today_amount))
-    st.markdown("---")
-    
-    create_summary_table(exploded_df, today_sales_date, today_sales_date, "Today's Sales Breakdown")
-    
-# 2. LAST 7 DAYS (NEW METRIC)
-with col_7days:
-    # Last 7 Days Amount Metric
-    st.subheader("Last 7 Days Total Sales")
-    last_7_amount = sum_between(raw_df, last_7_days_start, today)
-    st.metric("**Total Last 7 Days Sales**", metric_format(last_7_amount))
-    st.markdown("---")
-    
-    create_summary_table(exploded_df, last_7_days_start, today, "Last 7 Days Sales Breakdown")
+# 1. TODAY'S SALES
+st.markdown("## 📅 Today's Sales Performance")
+today_sales_date = today 
+today_metrics = get_kpi_metrics(today_sales_date, today_sales_date)
+
+col_t1, col_t2, col_t3, col_t4 = st.columns(4)
+with col_t1:
+    st.metric("**Total Sales**", metric_format(today_metrics["total_amount"]))
+with col_t2:
+    st.metric("**Total Transactions**", today_metrics["total_transactions"])
+with col_t3:
+    st.metric("**Unique Customers**", today_metrics["unique_customers"])
+with col_t4:
+    st.metric("**Top Commodity**", f"{today_metrics['top_commodity_name']} ({today_metrics['top_commodity_amount']})")
+
+create_summary_table_vertical(
+    today_metrics["df"], 
+    "Today's Sales Breakdown", 
+    today_metrics["total_transactions"]
+)
+st.markdown("---")
+
+
+# 2. LAST 7 DAYS
+st.markdown("## 📈 Last 7 Days Performance")
+last_7_metrics = get_kpi_metrics(last_7_days_start, today)
+
+col_7_1, col_7_2, col_7_3, col_7_4 = st.columns(4)
+with col_7_1:
+    st.metric("**Total Sales**", metric_format(last_7_metrics["total_amount"]))
+with col_7_2:
+    st.metric("**Total Transactions**", last_7_metrics["total_transactions"])
+with col_7_3:
+    st.metric("**Unique Customers**", last_7_metrics["unique_customers"])
+with col_7_4:
+    st.metric("**Top Commodity**", f"{last_7_metrics['top_commodity_name']} ({last_7_metrics['top_commodity_amount']})")
+
+create_summary_table_vertical(
+    last_7_metrics["df"], 
+    "Last 7 Days Breakdown", 
+    last_7_metrics["total_transactions"]
+)
+st.markdown("---")
+
 
 # 3. LAST 30 DAYS
-with col_30days:
-    # Last 30 Days Amount Metric
-    st.subheader("Last 30 Days Total Sales")
-    last_30_amount = sum_between(raw_df, last_30_days_start, today)
-    st.metric("**Total Last 30 Days Sales**", metric_format(last_30_amount))
-    st.markdown("---")
-    
-    create_summary_table(exploded_df, last_30_days_start, today, "Last 30 Days Sales Breakdown")
+st.markdown("## 🗓️ Last 30 Days Performance")
+last_30_metrics = get_kpi_metrics(last_30_days_start, today)
 
-# 4. YTD SUMMARY & TABLE (Now in 4th column)
-with col_ytd_tables:
-    # YTD Amount Metric
-    st.subheader("Year-To-Date Total Sales")
-    ytd_amount = sum_between(raw_df, start_of_year, today)
-    st.metric("**Total YTD Sales**", metric_format(ytd_amount))
-    st.markdown("---")
-    
-    # YTD Sales Breakdown Table
-    create_summary_table(exploded_df, start_of_year, today, "YTD Sales Breakdown")
-    
+col_30_1, col_30_2, col_30_3, col_30_4 = st.columns(4)
+with col_30_1:
+    st.metric("**Total Sales**", metric_format(last_30_metrics["total_amount"]))
+with col_30_2:
+    st.metric("**Total Transactions**", last_30_metrics["total_transactions"])
+with col_30_3:
+    st.metric("**Unique Customers**", last_30_metrics["unique_customers"])
+with col_30_4:
+    st.metric("**Top Commodity**", f"{last_30_metrics['top_commodity_name']} ({last_30_metrics['top_commodity_amount']})")
 
+create_summary_table_vertical(
+    last_30_metrics["df"], 
+    "Last 30 Days Breakdown", 
+    last_30_metrics["total_transactions"]
+)
+st.markdown("---")
+
+
+# 4. YEAR-TO-DATE
+st.markdown("## 💰 Year-to-Date (YTD) Performance")
+ytd_metrics = get_kpi_metrics(start_of_year, today)
+
+col_ytd_1, col_ytd_2, col_ytd_3, col_ytd_4 = st.columns(4)
+with col_ytd_1:
+    st.metric("**Total Sales**", metric_format(ytd_metrics["total_amount"]))
+with col_ytd_2:
+    st.metric("**Total Transactions**", ytd_metrics["total_transactions"])
+with col_ytd_3:
+    st.metric("**Unique Customers**", ytd_metrics["unique_customers"])
+with col_ytd_4:
+    st.metric("**Top Commodity**", f"{ytd_metrics['top_commodity_name']} ({ytd_metrics['top_commodity_amount']})")
+
+create_summary_table_vertical(
+    ytd_metrics["df"], 
+    "YTD Sales Breakdown", 
+    ytd_metrics["total_transactions"]
+)
 st.markdown("---")
 
 # ==============================================================================
