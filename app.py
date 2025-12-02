@@ -7,41 +7,40 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from zoneinfo import ZoneInfo
-from typing import List
 
-# --- Assuming these utilities are correctly defined in report_utils.py ---
 from report_utils import (
     load_data,
     explode_commodities,
     get_kpi_metrics,
     metric_format,
+    count_transactions,
+    sum_between,
     CURRENCY_CODE,
     CURRENCY_FORMAT,
 )
-# -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
-# PAGE CONFIG 
+# PAGE CONFIG
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Zarai Mandi Sales Dashboard",
+    page_title="Zaraimandi Sales Dashboard",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-
-st.title("Zarai Mandi Sales Dashboard")
-st.markdown("**Transaction and Commodity-level Sales Intelligence.**")
+st.title("Zaraimandi Sales Dashboard")
+st.markdown("Transaction and Commodity-level Sales Intelligence.")
 st.markdown("---")
 
-
 # -----------------------------------------------------------------------------
-# EMAIL HELPERS AND DATA CACHE 
+# EMAIL HELPERS AND DATA CACHE
 # -----------------------------------------------------------------------------
 
 @st.cache_data(ttl=300, show_spinner="Connecting to Google Sheet and loading...")
 def cached_load_data():
     """
     Load data from Google Sheets and remember when it was refreshed.
+
+    ttl=300 means Streamlit will reload from the Sheet at most every 5 minutes.
     """
     df = load_data(use_cache=False)
     refreshed_at = datetime.now(ZoneInfo("Asia/Karachi"))
@@ -99,6 +98,7 @@ def get_commodity_comparisons(exploded_df: pd.DataFrame, report_date: date) -> p
 def calculate_rank_movement(exploded_df: pd.DataFrame, report_date: date) -> pd.DataFrame:
     """
     Calculates current YTD ranking and compares it to YTD ranking 30 days prior.
+    NaN safe.
     """
     last_month_end_date = report_date - timedelta(days=30)
     start_of_year = date(report_date.year, 1, 1)
@@ -213,7 +213,7 @@ def build_daily_email_html(
     html = f"""
     <html>
     <body style="font-family:Arial, sans-serif; font-size:14px;">
-        <h2>Zarai Mandi Daily Report – {report_date}</h2>
+        <h2>Zaraimandi Daily Report – {report_date}</h2>
         <p>This report summarizes the day's gross sales activity with context vs recent performance.</p>
 
         <ul>
@@ -260,7 +260,7 @@ def build_daily_email_html(
     return html
 
 
-def send_email_report(recipient_emails: List[str], report_date: date) -> bool:
+def send_email_report(recipient_emails: list, report_date: date) -> bool:
     """Send the HTML report email to multiple recipients using st.secrets."""
     try:
         smtp_user = st.secrets["SMTP_USER"]
@@ -302,7 +302,7 @@ def send_email_report(recipient_emails: List[str], report_date: date) -> bool:
     )
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"[V2] Zarai Mandi Daily Sales Report – {report_date}"
+    msg["Subject"] = f"[V2] Zaraimandi Daily Sales Report – {report_date}"
     msg["From"] = smtp_user
     msg["To"] = ", ".join(recipient_emails)
     msg.attach(MIMEText(html_body, "html"))
@@ -317,80 +317,31 @@ def send_email_report(recipient_emails: List[str], report_date: date) -> bool:
         return False
 
 # -----------------------------------------------------------------------------
-# CUSTOM KPI CARD FUNCTION 
-# -----------------------------------------------------------------------------
-
-def st_kpi_card(
-    metric_name: str,
-    current_value: float,
-    comparison_value: float,
-    value_format: str = "",
-    delta_label: str = "vs Prior Period",
-):
-    """
-    Renders a Streamlit metric card with automatic percentage change calculation
-    and professional styling.
-    """
-    if comparison_value == 0:
-        delta = 0.0
-        delta_str = "New Data" if current_value != 0 else "No Change"
-        delta_color = "off"
-    else:
-        delta = (current_value - comparison_value) / comparison_value * 100
-        delta_str = f"{abs(delta):.1f}% {delta_label}"
-        if delta > 0:
-            delta_color = "normal"
-        elif delta < 0:
-            delta_color = "inverse"
-        else:
-            delta_color = "off"
-
-    if value_format == "currency":
-        value_str = metric_format(current_value)
-    elif value_format == "int":
-        value_str = f"{current_value:,.0f}"
-    else:
-        value_str = str(current_value)
-
-    st.metric(
-        label=metric_name,
-        value=value_str,
-        delta=delta_str,
-        delta_color=delta_color,
-    )
-
-# -----------------------------------------------------------------------------
-# DATA LOAD AND SETUP
+# LOAD DATA WITH REFRESH BUTTON
 # -----------------------------------------------------------------------------
 
 refresh_col, _ = st.columns([1, 4])
 with refresh_col:
-    # This logic is safe and clears the cache before rerunning
     if st.button("Refresh data from Google Sheet"):
         cached_load_data.clear()
-        st.rerun()
+        st.experimental_rerun()
 
 raw_df, refreshed_at = cached_load_data()
 exploded_df = explode_commodities(raw_df)
 
 if raw_df.empty:
-    st.info("No data available.")
     st.stop()
 
 st.caption(
-    f"Data last refreshed at **{refreshed_at.strftime('%Y-%m-%d %H:%M %Z')}** "
+    f"Data last refreshed at {refreshed_at.strftime('%Y-%m-%d %H:%M %Z')} "
     f"(auto refresh every 5 minutes or use the Refresh button above)."
 )
 
-# Date calculations
 today = date.today()
 start_of_year = date(today.year, 1, 1)
 last_30_days_start = today - timedelta(days=29)
-last_60_days_start = today - timedelta(days=59)
 last_7_days_start = today - timedelta(days=6)
-previous_7_days_start = today - timedelta(days=13)
 
-# Filter date setup
 safe_min_date = date(2020, 1, 1)
 safe_max_date = today
 raw_min = raw_df["date"].min()
@@ -419,7 +370,6 @@ with filter_cols[0]:
 filter_start_date = min(date_range)
 filter_end_date = max(date_range) if len(date_range) == 2 else date_range[0]
 
-# --- Data filtering ---
 raw_df_filtered = raw_df[
     (raw_df["date"] >= filter_start_date) & (raw_df["date"] <= filter_end_date)
 ]
@@ -469,180 +419,67 @@ if send_now:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# KPI BLOCKS (REFACTORED FOR COMPARISON)
+# KPI BLOCKS
 # -----------------------------------------------------------------------------
 
-st.header("Last 30 Days Performance")
+st.header("Key Performance Indicators (KPIs) - Gross Sales")
 
-# 1. Calculate the metrics for the current period (Last 30 Days)
-current_metrics = get_kpi_metrics(raw_df, exploded_df, last_30_days_start, today)
-# 2. Calculate the metrics for the comparison period (Prior 30 Days)
-prior_30_days_end = last_30_days_start - timedelta(days=1)
-prior_30_days_start = last_60_days_start
-prior_metrics = get_kpi_metrics(raw_df, exploded_df, prior_30_days_start, prior_30_days_end)
 
-# --- Render KPI Cards ---
-col1, col2, col3, col4, col5 = st.columns(5)
-
-with col1:
-    st_kpi_card(
-        "Total Sales",
-        current_metrics["total_amount"],
-        prior_metrics["total_amount"],
-        value_format="currency",
-        delta_label="vs Prior 30 Days",
-    )
-with col2:
-    st_kpi_card(
-        "Total Transactions",
-        current_metrics["total_transactions"],
-        prior_metrics["total_transactions"],
-        value_format="int",
-        delta_label="vs Prior 30 Days",
-    )
-with col3:
-    st_kpi_card(
-        "Unique Customers",
-        current_metrics["unique_customers"],
-        prior_metrics["unique_customers"],
-        value_format="int",
-        delta_label="vs Prior 30 Days",
-    )
-with col4:
-    # Calculate Average Transaction Value (ATV)
-    current_atv = current_metrics["total_amount"] / current_metrics["total_transactions"] if current_metrics["total_transactions"] else 0
-    prior_atv = prior_metrics["total_amount"] / prior_metrics["total_transactions"] if prior_metrics["total_transactions"] else 0
-    st_kpi_card(
-        "Avg. Transaction Value",
-        current_atv,
-        prior_atv,
-        value_format="currency",
-        delta_label="vs Prior 30 Days",
-    )
-with col5:
-    top_commodity_amount = current_metrics['top_commodity_amount']
-    top_commodity_name = current_metrics['top_commodity_name']
-    
-    # CORRECTED LOGIC: Use pd.notna and float() to safely check the amount (Fixes TypeError)
-    if pd.notna(top_commodity_amount) and float(top_commodity_amount) > 0:
-        sub_value = f"({metric_format(top_commodity_amount)})"
-    else:
-        # Display a clear message if there are no sales in the period
-        sub_value = "(No sales this period)"
-        top_commodity_name = "N/A"
-        
-    st.metric(
-        "Top Commodity",
-        top_commodity_name,
-        sub_value,
-    )
-
-st.markdown("---")
-
-# -----------------------------------------------------------------------------
-# DAILY TREND CHART (Mandatory for professional dashboards)
-# -----------------------------------------------------------------------------
-
-st.subheader("Daily Sales Trend")
-
-# Aggregate sales by day for the filter period
-daily_sales_df = (
-    raw_df_filtered.groupby("date")["amount_pkr"]
-    .sum()
-    .reset_index()
-    .rename(columns={"amount_pkr": "Total Sales"})
-)
-
-if not daily_sales_df.empty:
-    daily_chart = (
-        alt.Chart(daily_sales_df)
-        .mark_line(point=True, color="#007BFF") # Use a default blue accent
-        .encode(
-            x=alt.X("date:T", title="Date"),
-            y=alt.Y("Total Sales:Q", title=f"Total Sales ({CURRENCY_CODE})", axis=alt.Axis(format=CURRENCY_FORMAT)),
-            tooltip=[
-                alt.Tooltip("date:T", title="Date", format="%Y-%m-%d"),
-                alt.Tooltip("Total Sales:Q", title="Sales Amount", format=CURRENCY_FORMAT),
-            ],
-        )
-        .properties(height=300, title="Gross Sales Over Selected Period")
-        .interactive()
-    )
-
-    st.altair_chart(daily_chart, use_container_width=True)
-
-st.markdown("---")
-
-# -----------------------------------------------------------------------------
-# COMMODITY PERFORMANCE (Visualized)
-# -----------------------------------------------------------------------------
-
-st.header("Top Commodity Performance & Mix")
-col_chart, col_table = st.columns([2, 1])
-
-# --- Chart Column (Visual Breakdown) ---
-with col_chart:
-    st.subheader("Top Selling Commodities (Revenue)")
-
-    commodity_summary = (
-        exploded_df_filtered.groupby("commodity")["gross_amount_per_commodity"]
+def create_summary_table_vertical(df, period_title, transactions_count):
+    AMOUNT_COL_NAME = f"Amount ({CURRENCY_CODE})"
+    summary_df = (
+        df.groupby(["customer_name", "commodity"])["gross_amount_per_commodity"]
         .sum()
         .reset_index()
-        .rename(columns={"gross_amount_per_commodity": "Amount"})
-        .sort_values("Amount", ascending=False)
+    )
+    summary_df = summary_df.rename(
+        columns={
+            "customer_name": "Customer",
+            "commodity": "Commodity",
+            "gross_amount_per_commodity": AMOUNT_COL_NAME,
+        }
+    )
+    summary_df = summary_df.sort_values(AMOUNT_COL_NAME, ascending=False)
+    styled_df = summary_df.style.format(
+        {AMOUNT_COL_NAME: f"{CURRENCY_CODE} {{:,.0f}}"}
     )
 
-    max_commodities = len(commodity_summary)
-    top_n_default = min(10, max_commodities)
+    st.subheader(f"Detailed Breakdown (Total Transactions: {transactions_count})")
+    with st.container(border=True):
+        st.dataframe(styled_df, use_container_width=True, hide_index=True, height=500)
 
-    top_n = st.slider(
-        "Select Top N Commodities to Display",
-        1,
-        max_commodities,
-        top_n_default,
-        key="top_n_slider_new",
-    )
 
-    top_commodity_summary = commodity_summary.head(top_n)
+def render_kpi_block(title, start_date, end_date):
+    st.markdown(f"## {title}")
+    metrics = get_kpi_metrics(raw_df, exploded_df, start_date, end_date)
 
-    chart_bar = (
-        alt.Chart(top_commodity_summary)
-        .mark_bar(color="#007BFF") # Use a default blue accent
-        .encode(
-            x=alt.X(
-                "Amount:Q",
-                title=f"Total Sales ({CURRENCY_CODE})",
-                axis=alt.Axis(format=CURRENCY_FORMAT),
-            ),
-            y=alt.Y("commodity:N", sort="-x", title="Commodity"),
-            tooltip=[
-                alt.Tooltip("commodity:N", title="Commodity"),
-                alt.Tooltip("Amount:Q", title="Sales Amount", format=CURRENCY_FORMAT),
-            ],
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("**Total Sales**", metric_format(metrics["total_amount"]))
+    with col2:
+        st.metric("**Total Transactions**", metrics["total_transactions"])
+    with col3:
+        st.metric("**Unique Customers**", metrics["unique_customers"])
+    with col4:
+        st.metric(
+            "**Top Commodity**",
+            f"{metrics['top_commodity_name']} ({metrics['top_commodity_amount']})",
         )
-        .properties(title=f"Top {top_n} Commodities by Sales Amount")
-        .interactive()
+
+    create_summary_table_vertical(
+        metrics["df"], title, metrics["total_transactions"]
     )
+    st.markdown("---")
+    return metrics
 
-    st.altair_chart(chart_bar, use_container_width=True)
 
-# --- Table Column (Cleaned up Summary Table) ---
-with col_table:
-    st.subheader("Summary Table and Mix")
-    # Calculate percentage mix for a better summary
-    total_sales = commodity_summary['Amount'].sum()
-    commodity_summary['Mix (%)'] = (commodity_summary['Amount'] / total_sales * 100).round(1)
-
-    styled_df = commodity_summary.style.format(
-        {"Amount": f"{CURRENCY_CODE} {{:,.0f}}", "Mix (%)": "{:.1f}%"}
-    )
-    # Increased height to match chart height
-    st.dataframe(styled_df, use_container_width=True, hide_index=True, height=500)
-
-st.markdown("---")
+render_kpi_block("Today's Sales Performance", today, today)
+render_kpi_block("Last 7 Days Performance", last_7_days_start, today)
+render_kpi_block("Last 30 Days Performance", last_30_days_start, today)
+render_kpi_block("Year-to-Date (YTD) Performance", start_of_year, today)
 
 # -----------------------------------------------------------------------------
-# LOYALTY, SEASONALITY, DATA EXPLORER
+# LOYALTY, SEASONALITY, COMMODITY MIX, DATA EXPLORER
 # -----------------------------------------------------------------------------
 
 st.header("Commodity Loyalty Analysis")
@@ -721,7 +558,7 @@ seasonality_chart_data = seasonality_summary[
 if not seasonality_chart_data.empty:
     season_chart = (
         alt.Chart(seasonality_chart_data)
-        .mark_line(point=True, color="#007BFF")
+        .mark_line(point=True)
         .encode(
             x=alt.X(
                 "Month_Name:T",
@@ -749,6 +586,63 @@ else:
     st.info(
         f"No seasonality data found for {selected_season_commodity} in the dataset."
     )
+st.markdown("---")
+
+st.header("Commodity Performance & Mix (All Data)")
+
+commodity_summary = (
+    exploded_df_filtered.groupby("commodity")["gross_amount_per_commodity"]
+    .sum()
+    .reset_index()
+    .rename(columns={"gross_amount_per_commodity": "Amount"})
+    .sort_values("Amount", ascending=False)
+)
+
+col_chart, col_table = st.columns([2, 1])
+
+with col_chart:
+    st.subheader("Top Selling Commodities (Volume)")
+
+    max_commodities = len(commodity_summary)
+    top_n_default = min(10, max_commodities)
+
+    top_n = st.slider(
+        "Select Top N Commodities to Display",
+        1,
+        max_commodities,
+        top_n_default,
+        key="top_n_slider",
+    )
+
+    top_commodity_summary = commodity_summary.head(top_n)
+
+    chart_bar = (
+        alt.Chart(top_commodity_summary)
+        .mark_bar()
+        .encode(
+            x=alt.X(
+                "Amount:Q",
+                title=f"Total Sales ({CURRENCY_CODE})",
+                axis=alt.Axis(format=CURRENCY_FORMAT),
+            ),
+            y=alt.Y("commodity:N", sort="-x", title="Commodity"),
+            tooltip=[
+                alt.Tooltip("commodity:N", title="Commodity"),
+                alt.Tooltip("Amount:Q", title="Sales Amount", format=CURRENCY_FORMAT),
+            ],
+        )
+        .properties(title=f"Top {top_n} Commodities by Sales Amount")
+        .interactive()
+    )
+
+    st.altair_chart(chart_bar, use_container_width=True)
+
+with col_table:
+    st.subheader("Summary Table")
+    styled_df = commodity_summary.style.format(
+        {"Amount": f"{CURRENCY_CODE} {{:,.0f}}"}
+    )
+    st.dataframe(styled_df, use_container_width=True, hide_index=True)
 st.markdown("---")
 
 st.header("Data Explorer: Transaction and Commodity Detail")
