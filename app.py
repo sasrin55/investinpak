@@ -7,7 +7,6 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from zoneinfo import ZoneInfo
-from typing import Union
 
 from report_utils import (
     load_data,
@@ -24,11 +23,11 @@ from report_utils import (
 # PAGE CONFIG
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Zarai Mandi Sales Dashboard",
+    page_title="Zaraimandi Sales Dashboard",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-st.title("Zarai Mandi Sales Dashboard")
+st.title("Zaraimandi Sales Dashboard")
 st.markdown("Transaction and Commodity-level Sales Intelligence.")
 st.markdown("---")
 
@@ -40,6 +39,8 @@ st.markdown("---")
 def cached_load_data():
     """
     Load data from Google Sheets and remember when it was refreshed.
+
+    ttl=300 means Streamlit will reload from the Sheet at most every 5 minutes.
     """
     df = load_data(use_cache=False)
     refreshed_at = datetime.now(ZoneInfo("Asia/Karachi"))
@@ -122,6 +123,7 @@ def calculate_rank_movement(exploded_df: pd.DataFrame, report_date: date) -> pd.
         axis=1,
     )
 
+    # If there was no baseline rank, start baseline at current so movement = 0
     rank_comparison["Baseline Rank"] = rank_comparison["Baseline Rank"].fillna(
         rank_comparison["Current Rank"]
     )
@@ -211,7 +213,7 @@ def build_daily_email_html(
     html = f"""
     <html>
     <body style="font-family:Arial, sans-serif; font-size:14px;">
-        <h2>Zarai Mandi Daily Report – {report_date}</h2>
+        <h2>Zaraimandi Daily Report – {report_date}</h2>
         <p>This report summarizes the day's gross sales activity with context vs recent performance.</p>
 
         <ul>
@@ -300,7 +302,7 @@ def send_email_report(recipient_emails: list, report_date: date) -> bool:
     )
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"[V2] Zarai Mandi Daily Sales Report – {report_date}"
+    msg["Subject"] = f"[V2] Zaraimandi Daily Sales Report – {report_date}"
     msg["From"] = smtp_user
     msg["To"] = ", ".join(recipient_emails)
     msg.attach(MIMEText(html_body, "html"))
@@ -322,7 +324,7 @@ refresh_col, _ = st.columns([1, 4])
 with refresh_col:
     if st.button("Refresh data from Google Sheet"):
         cached_load_data.clear()
-        st.rerun()
+        st.experimental_rerun() # NOTE: Using the original, likely deprecated function here
 
 raw_df, refreshed_at = cached_load_data()
 exploded_df = explode_commodities(raw_df)
@@ -430,33 +432,21 @@ def create_summary_table_vertical(df, period_title, transactions_count):
         .sum()
         .reset_index()
     )
-    # RENAME COLUMNS: Improving Grammar/Labels
     summary_df = summary_df.rename(
         columns={
-            "customer_name": "Customer Name",
+            "customer_name": "Customer",
             "commodity": "Commodity",
             "gross_amount_per_commodity": AMOUNT_COL_NAME,
         }
     )
     summary_df = summary_df.sort_values(AMOUNT_COL_NAME, ascending=False)
-    
-    # NEW SUBHEADER: Removing parentheses and using cleaner text
-    st.subheader(f"Detailed Breakdown: Total Transactions {transactions_count}") 
-    
+    styled_df = summary_df.style.format(
+        {AMOUNT_COL_NAME: f"{CURRENCY_CODE} {{:,.0f}}"}
+    )
+
+    st.subheader(f"Detailed Breakdown (Total Transactions: {transactions_count})")
     with st.container(border=True):
-        st.dataframe(
-            summary_df,
-            use_container_width=True,
-            hide_index=True,
-            height=500,
-            # Cooler Table: Using st.column_config for modern number formatting
-            column_config={
-                AMOUNT_COL_NAME: st.column_config.NumberColumn(
-                    f"Amount ({CURRENCY_CODE})",
-                    format=CURRENCY_FORMAT,
-                )
-            }
-        )
+        st.dataframe(styled_df, use_container_width=True, hide_index=True, height=500)
 
 
 def render_kpi_block(title, start_date, end_date):
@@ -471,29 +461,9 @@ def render_kpi_block(title, start_date, end_date):
     with col3:
         st.metric("**Unique Customers**", metrics["unique_customers"])
     with col4:
-        top_commodity_name = metrics.get("top_commodity_name")
-        top_commodity_amount = metrics.get("top_commodity_amount")
-        
-        # FINAL STABILIZING FIX: Safely check and format amount
-        if top_commodity_amount is None:
-            display_value = "N/A (No Sales)"
-        else:
-            try:
-                # Attempt to convert to float to handle numeric strings/numbers
-                numeric_amount = float(top_commodity_amount)
-                if numeric_amount == 0:
-                    display_value = "N/A (No Sales)"
-                else:
-                    # Format the amount and strip any residual parentheses (cleanup)
-                    formatted_amount = metric_format(numeric_amount).strip('()')
-                    display_value = f"{top_commodity_name} {formatted_amount}"
-            except ValueError:
-                # Fallback if the amount string is non-numeric (e.g., "N/A" or "Error")
-                display_value = f"{top_commodity_name} (Error)"
-            
         st.metric(
             "**Top Commodity**",
-            display_value,
+            f"{metrics['top_commodity_name']} ({metrics['top_commodity_amount']})",
         )
 
     create_summary_table_vertical(
@@ -669,17 +639,11 @@ with col_chart:
 
 with col_table:
     st.subheader("Summary Table")
-    st.dataframe(
-        commodity_summary,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Amount": st.column_config.NumberColumn(
-                f"Amount ({CURRENCY_CODE})",
-                format=CURRENCY_FORMAT,
-            )
-        }
+    # Original table rendering logic
+    styled_df = commodity_summary.style.format(
+        {"Amount": f"{CURRENCY_CODE} {{:,.0f}}"}
     )
+    st.dataframe(styled_df, use_container_width=True, hide_index=True)
 st.markdown("---")
 
 st.header("Data Explorer: Transaction and Commodity Detail")
@@ -703,42 +667,24 @@ if data_choice == "Raw Transactions (Total Amount)":
     df_display.rename(
         columns={"amount_pkr": f"Gross Amount ({CURRENCY_CODE})"}, inplace=True
     )
-
-    st.dataframe(
-        df_display,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            f"Gross Amount ({CURRENCY_CODE})": st.column_config.NumberColumn(
-                f"Gross Amount ({CURRENCY_CODE})",
-                format=CURRENCY_FORMAT,
-            )
-        },
+    styled_df = df_display.style.format(
+        {f"Gross Amount ({CURRENCY_CODE})": f"{CURRENCY_CODE} {{:,.0f}}"}
     )
-
+    st.dataframe(styled_df, use_container_width=True)
 else:
     st.subheader("Exploded Commodity Data")
-    df_display = (
-        exploded_df_filtered.sort_values(
-            ["date", "customer_name"], ascending=False
-        )
-        .drop(columns=["amount_pkr"], errors="ignore")
-    )
+    df_display = exploded_df_filtered.sort_values(
+        ["date", "customer_name"], ascending=False
+    ).drop(columns=["amount_pkr"], errors="ignore")
     df_display.rename(
         columns={
             "gross_amount_per_commodity": f"Gross Amount per Commodity ({CURRENCY_CODE})"
         },
         inplace=True,
     )
-
-    st.dataframe(
-        df_display,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            f"Gross Amount per Commodity ({CURRENCY_CODE})": st.column_config.NumberColumn(
-                f"Gross Amount per Commodity ({CURRENCY_CODE})",
-                format=CURRENCY_FORMAT,
-            )
-        },
+    styled_df = df_display.style.format(
+        {
+            f"Gross Amount per Commodity ({CURRENCY_CODE})": f"{CURRENCY_CODE} {{:,.0f}}"
+        }
     )
+    st.dataframe(styled_df, use_container_width=True)
