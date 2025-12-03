@@ -7,8 +7,6 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from zoneinfo import ZoneInfo
-from analytics_service import get_dashboard_data   # NEW
-print("TEST:", get_dashboard_data(date.today()))   # NEW
 
 from report_utils import (
     load_data,
@@ -92,7 +90,7 @@ def get_commodity_comparisons(exploded_df: pd.DataFrame, report_date: date) -> p
     ).round(1)
 
     comparison_df = comparison_df.reset_index()
-    comparison_df = comparison_df.sort_values("Current_Month", ascending=False).head(10)
+    comparison_df = comparison_summary.sort_values("Current_Month", ascending=False).head(10)
 
     return comparison_df[["commodity", "Current_Month", "WoW Change %", "MoM Change %"]]
 
@@ -437,7 +435,7 @@ def create_summary_table_vertical(df, period_title, transactions_count):
     # RENAME COLUMNS: Improving Grammar/Labels
     summary_df = summary_df.rename(
         columns={
-            "customer_name": "Customer Name", # Grammar/Clarity fix
+            "customer_name": "Customer Name", 
             "commodity": "Commodity",
             "gross_amount_per_commodity": AMOUNT_COL_NAME,
         }
@@ -475,32 +473,28 @@ def render_kpi_block(title, start_date, end_date):
     with col3:
         st.metric("**Unique Customers**", metrics["unique_customers"])
     with col4:
-        top_commodity_name = metrics["top_commodity_name"]
-        top_commodity_amount = metrics["top_commodity_amount"]
-
-        # Handle both numeric and already-formatted values safely
-        if top_commodity_amount is None:
-            display_value = "N/A (No Sales)"
-        else:
-            # If it's numeric, format it; if it's a string, just use it
-            if isinstance(top_commodity_amount, (int, float, np.number)):
-                formatted_amount = metric_format(top_commodity_amount)
-            else:
-                # already formatted string like "PKR 9,400"
-                formatted_amount = str(top_commodity_amount)
-
-            # Optional: remove parentheses if your formatter ever adds them
-            formatted_amount = formatted_amount.strip("()")
-
+        top_commodity_name = metrics['top_commodity_name']
+        top_commodity_amount = metrics['top_commodity_amount']
+        
+        # FINAL STABILIZING FIX: Safely check and format amount
+        if top_commodity_amount is not None and (isinstance(top_commodity_amount, (int, float, np.number)) or float(top_commodity_amount) != 0):
+            # Format and strip parentheses if they exist (clean display)
+            formatted_amount = metric_format(top_commodity_amount).strip('()')
             display_value = f"{top_commodity_name} {formatted_amount}"
-
-        st.metric("**Top Commodity**", display_value)
+        else:
+            display_value = "N/A (No Sales)"
+            
+        st.metric(
+            "**Top Commodity**",
+            display_value,
+        )
 
     create_summary_table_vertical(
         metrics["df"], title, metrics["total_transactions"]
     )
     st.markdown("---")
     return metrics
+
 
 render_kpi_block("Today's Sales Performance", today, today)
 render_kpi_block("Last 7 Days Performance", last_7_days_start, today)
