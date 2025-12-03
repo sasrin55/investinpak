@@ -90,7 +90,8 @@ def get_commodity_comparisons(exploded_df: pd.DataFrame, report_date: date) -> p
     ).round(1)
 
     comparison_df = comparison_df.reset_index()
-    comparison_df = comparison_summary.sort_values("Current_Month", ascending=False).head(10)
+    # fixed: use comparison_df instead of undefined comparison_summary
+    comparison_df = comparison_df.sort_values("Current_Month", ascending=False).head(10)
 
     return comparison_df[["commodity", "Current_Month", "WoW Change %", "MoM Change %"]]
 
@@ -123,7 +124,6 @@ def calculate_rank_movement(exploded_df: pd.DataFrame, report_date: date) -> pd.
         axis=1,
     )
 
-    # If there was no baseline rank, start baseline at current so movement = 0
     rank_comparison["Baseline Rank"] = rank_comparison["Baseline Rank"].fillna(
         rank_comparison["Current Rank"]
     )
@@ -324,7 +324,7 @@ refresh_col, _ = st.columns([1, 4])
 with refresh_col:
     if st.button("Refresh data from Google Sheet"):
         cached_load_data.clear()
-        st.rerun() # FIXED: Changed st.experimental_rerun() to st.rerun()
+        st.rerun()
 
 raw_df, refreshed_at = cached_load_data()
 exploded_df = explode_commodities(raw_df)
@@ -432,26 +432,24 @@ def create_summary_table_vertical(df, period_title, transactions_count):
         .sum()
         .reset_index()
     )
-    # RENAME COLUMNS: Improving Grammar/Labels
+
     summary_df = summary_df.rename(
         columns={
-            "customer_name": "Customer Name", 
+            "customer_name": "Customer Name",
             "commodity": "Commodity",
             "gross_amount_per_commodity": AMOUNT_COL_NAME,
         }
     )
     summary_df = summary_df.sort_values(AMOUNT_COL_NAME, ascending=False)
-    
-    # NEW SUBHEADER: Removing parentheses and using cleaner text
-    st.subheader(f"Detailed Breakdown: Total Transactions {transactions_count}") 
-    
+
+    st.subheader(f"Detailed Breakdown: Total Transactions {transactions_count}")
+
     with st.container(border=True):
         st.dataframe(
             summary_df,
             use_container_width=True,
             hide_index=True,
             height=500,
-            # Cooler Table: Using st.column_config for modern number formatting
             column_config={
                 AMOUNT_COL_NAME: st.column_config.NumberColumn(
                     f"Amount ({CURRENCY_CODE})",
@@ -473,21 +471,27 @@ def render_kpi_block(title, start_date, end_date):
     with col3:
         st.metric("**Unique Customers**", metrics["unique_customers"])
     with col4:
-        top_commodity_name = metrics['top_commodity_name']
-        top_commodity_amount = metrics['top_commodity_amount']
-        
-        # FINAL STABILIZING FIX: Safely check and format amount
-        if top_commodity_amount is not None and (isinstance(top_commodity_amount, (int, float, np.number)) or float(top_commodity_amount) != 0):
-            # Format and strip parentheses if they exist (clean display)
-            formatted_amount = metric_format(top_commodity_amount).strip('()')
-            display_value = f"{top_commodity_name} {formatted_amount}"
-        else:
+        top_commodity_name = metrics.get("top_commodity_name")
+        top_commodity_amount = metrics.get("top_commodity_amount")
+
+        # robust handling: works for None, 0, numbers, or strings
+        if top_commodity_amount is None:
             display_value = "N/A (No Sales)"
-            
-        st.metric(
-            "**Top Commodity**",
-            display_value,
-        )
+        else:
+            if isinstance(top_commodity_amount, (int, float, np.number)):
+                if top_commodity_amount == 0:
+                    display_value = "N/A (No Sales)"
+                else:
+                    formatted_amount = metric_format(float(top_commodity_amount)).strip("()")
+                    display_value = f"{top_commodity_name} {formatted_amount}"
+            else:
+                str_amount = str(top_commodity_amount).strip()
+                if str_amount in ("", "0", "PKR 0", "0.0"):
+                    display_value = "N/A (No Sales)"
+                else:
+                    display_value = f"{top_commodity_name} {str_amount}"
+
+        st.metric("**Top Commodity**", display_value)
 
     create_summary_table_vertical(
         metrics["df"], title, metrics["total_transactions"]
@@ -662,7 +666,6 @@ with col_chart:
 
 with col_table:
     st.subheader("Summary Table")
-    # Cooler Table: Using st.dataframe for cleaner display with custom formatting
     st.dataframe(
         commodity_summary,
         use_container_width=True,
@@ -697,36 +700,10 @@ if data_choice == "Raw Transactions (Total Amount)":
     df_display.rename(
         columns={"amount_pkr": f"Gross Amount ({CURRENCY_CODE})"}, inplace=True
     )
-    
+
     st.dataframe(
         df_display,
         use_container_width=True,
         column_config={
             f"Gross Amount ({CURRENCY_CODE})": st.column_config.NumberColumn(
                 f"Gross Amount ({CURRENCY_CODE})",
-                format=CURRENCY_FORMAT,
-            )
-        }
-    )
-else:
-    st.subheader("Exploded Commodity Data")
-    df_display = exploded_df_filtered.sort_values(
-        ["date", "customer_name"], ascending=False
-    ).drop(columns=["amount_pkr"], errors="ignore")
-    df_display.rename(
-        columns={
-            "gross_amount_per_commodity": f"Gross Amount per Commodity ({CURRENCY_CODE})"
-        },
-        inplace=True,
-    )
-    
-    st.dataframe(
-        df_display,
-        use_container_width=True,
-        column_config={
-            f"Gross Amount per Commodity ({CURRENCY_CODE})": st.column_config.NumberColumn(
-                f"Gross Amount per Commodity ({CURRENCY_CODE})",
-                format=CURRENCY_FORMAT,
-            )
-        }
-    )
