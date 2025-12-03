@@ -7,6 +7,7 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from zoneinfo import ZoneInfo
+from typing import Union
 
 from report_utils import (
     load_data,
@@ -39,8 +40,6 @@ st.markdown("---")
 def cached_load_data():
     """
     Load data from Google Sheets and remember when it was refreshed.
-
-    ttl=300 means Streamlit will reload from the Sheet at most every 5 minutes.
     """
     df = load_data(use_cache=False)
     refreshed_at = datetime.now(ZoneInfo("Asia/Karachi"))
@@ -90,7 +89,6 @@ def get_commodity_comparisons(exploded_df: pd.DataFrame, report_date: date) -> p
     ).round(1)
 
     comparison_df = comparison_df.reset_index()
-    # fixed: use comparison_df instead of undefined comparison_summary
     comparison_df = comparison_df.sort_values("Current_Month", ascending=False).head(10)
 
     return comparison_df[["commodity", "Current_Month", "WoW Change %", "MoM Change %"]]
@@ -432,7 +430,7 @@ def create_summary_table_vertical(df, period_title, transactions_count):
         .sum()
         .reset_index()
     )
-
+    # RENAME COLUMNS: Improving Grammar/Labels
     summary_df = summary_df.rename(
         columns={
             "customer_name": "Customer Name",
@@ -441,15 +439,17 @@ def create_summary_table_vertical(df, period_title, transactions_count):
         }
     )
     summary_df = summary_df.sort_values(AMOUNT_COL_NAME, ascending=False)
-
-    st.subheader(f"Detailed Breakdown: Total Transactions {transactions_count}")
-
+    
+    # NEW SUBHEADER: Removing parentheses and using cleaner text
+    st.subheader(f"Detailed Breakdown: Total Transactions {transactions_count}") 
+    
     with st.container(border=True):
         st.dataframe(
             summary_df,
             use_container_width=True,
             hide_index=True,
             height=500,
+            # Cooler Table: Using st.column_config for modern number formatting
             column_config={
                 AMOUNT_COL_NAME: st.column_config.NumberColumn(
                     f"Amount ({CURRENCY_CODE})",
@@ -473,25 +473,28 @@ def render_kpi_block(title, start_date, end_date):
     with col4:
         top_commodity_name = metrics.get("top_commodity_name")
         top_commodity_amount = metrics.get("top_commodity_amount")
-
-        # robust handling: works for None, 0, numbers, or strings
+        
+        # FINAL STABILIZING FIX: Safely check and format amount
         if top_commodity_amount is None:
             display_value = "N/A (No Sales)"
         else:
-            if isinstance(top_commodity_amount, (int, float, np.number)):
-                if top_commodity_amount == 0:
+            try:
+                # Attempt to convert to float to handle numeric strings/numbers
+                numeric_amount = float(top_commodity_amount)
+                if numeric_amount == 0:
                     display_value = "N/A (No Sales)"
                 else:
-                    formatted_amount = metric_format(float(top_commodity_amount)).strip("()")
+                    # Format the amount and strip any residual parentheses (cleanup)
+                    formatted_amount = metric_format(numeric_amount).strip('()')
                     display_value = f"{top_commodity_name} {formatted_amount}"
-            else:
-                str_amount = str(top_commodity_amount).strip()
-                if str_amount in ("", "0", "PKR 0", "0.0"):
-                    display_value = "N/A (No Sales)"
-                else:
-                    display_value = f"{top_commodity_name} {str_amount}"
-
-        st.metric("**Top Commodity**", display_value)
+            except ValueError:
+                # Fallback if the amount string is non-numeric (e.g., "N/A" or "Error")
+                display_value = f"{top_commodity_name} (Error)"
+            
+        st.metric(
+            "**Top Commodity**",
+            display_value,
+        )
 
     create_summary_table_vertical(
         metrics["df"], title, metrics["total_transactions"]
