@@ -23,11 +23,11 @@ from report_utils import (
 # PAGE CONFIG
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Zaraimandi Sales Dashboard",
+    page_title="Zarai Mandi Sales Dashboard",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-st.title("Zaraimandi Sales Dashboard")
+st.title("Zarai Mandi Sales Dashboard")
 st.markdown("Transaction and Commodity-level Sales Intelligence.")
 st.markdown("---")
 
@@ -213,7 +213,7 @@ def build_daily_email_html(
     html = f"""
     <html>
     <body style="font-family:Arial, sans-serif; font-size:14px;">
-        <h2>Zaraimandi Daily Report – {report_date}</h2>
+        <h2>Zarai Mandi Daily Report – {report_date}</h2>
         <p>This report summarizes the day's gross sales activity with context vs recent performance.</p>
 
         <ul>
@@ -302,7 +302,7 @@ def send_email_report(recipient_emails: list, report_date: date) -> bool:
     )
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"[V2] Zaraimandi Daily Sales Report – {report_date}"
+    msg["Subject"] = f"[V2] Zarai Mandi Daily Sales Report – {report_date}"
     msg["From"] = smtp_user
     msg["To"] = ", ".join(recipient_emails)
     msg.attach(MIMEText(html_body, "html"))
@@ -324,7 +324,7 @@ refresh_col, _ = st.columns([1, 4])
 with refresh_col:
     if st.button("Refresh data from Google Sheet"):
         cached_load_data.clear()
-        st.experimental_rerun() # NOTE: Using the original, likely deprecated function here
+        st.rerun() # FIXED: Changed st.experimental_rerun() to st.rerun()
 
 raw_df, refreshed_at = cached_load_data()
 exploded_df = explode_commodities(raw_df)
@@ -639,7 +639,6 @@ with col_chart:
 
 with col_table:
     st.subheader("Summary Table")
-    # Original table rendering logic
     styled_df = commodity_summary.style.format(
         {"Amount": f"{CURRENCY_CODE} {{:,.0f}}"}
     )
