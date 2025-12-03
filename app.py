@@ -704,6 +704,38 @@ if data_choice == "Raw Transactions (Total Amount)":
     st.dataframe(
         df_display,
         use_container_width=True,
+        hide_index=True,
         column_config={
             f"Gross Amount ({CURRENCY_CODE})": st.column_config.NumberColumn(
                 f"Gross Amount ({CURRENCY_CODE})",
+                format=CURRENCY_FORMAT,
+            )
+        },
+    )
+
+else:
+    st.subheader("Exploded Commodity Data")
+    df_display = (
+        exploded_df_filtered.sort_values(
+            ["date", "customer_name"], ascending=False
+        )
+        .drop(columns=["amount_pkr"], errors="ignore")
+    )
+    df_display.rename(
+        columns={
+            "gross_amount_per_commodity": f"Gross Amount per Commodity ({CURRENCY_CODE})"
+        },
+        inplace=True,
+    )
+
+    st.dataframe(
+        df_display,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            f"Gross Amount per Commodity ({CURRENCY_CODE})": st.column_config.NumberColumn(
+                f"Gross Amount per Commodity ({CURRENCY_CODE})",
+                format=CURRENCY_FORMAT,
+            )
+        },
+    )
