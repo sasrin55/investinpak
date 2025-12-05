@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import gspread
 from datetime import date
 from typing import Dict, Any, List
 
@@ -12,68 +11,56 @@ CURRENCY_FORMAT = ",.0f" # e.g., 10,000
 # --- DATA LOADING AND CLEANING ---
 
 @st.cache_data(ttl=300)
-def load_data(use_cache=True, sheet_name="Historical Data") -> pd.DataFrame:
+def load_data(sheet_url: str) -> pd.DataFrame:
     """
-    Load data from a Google Sheet worksheet.
+    Loads data directly from the CSV export URL of a public Google Sheet 
+    (assumes sheet access is set to "Anyone with the link").
     
     Args:
-        use_cache (bool): Whether to use Streamlit's cache (always True for this function).
-        sheet_name (str): The name of the worksheet/tab to load data from.
-        
-    Returns:
-        pd.DataFrame: The loaded and partially cleaned DataFrame.
+        sheet_url (str): The full CSV export URL for the specific worksheet (GID).
     """
     try:
-        # 1. Connect to Google Sheets
-        gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
-        spreadsheet_url = st.secrets["spreadsheet_url"]
+        # Load the sheet directly into a pandas DataFrame
+        df = pd.read_csv(sheet_url)
         
-        sh = gc.open_by_url(spreadsheet_url)
-        
-        # 2. Open the specific worksheet
-        worksheet = sh.worksheet(sheet_name) 
-        
-        # 3. Get all data and convert to DataFrame
-        data = worksheet.get_all_values()
-        df = pd.DataFrame(data[1:], columns=data[0])
-        
-        # 4. General Cleaning and Type Conversion
-        
-        # Drop rows that are entirely empty
-        df = df.dropna(how='all')
-        
-        # Standardize column names (optional, but good practice)
+        # Standardize column names (to lowercase and underscores)
         df.columns = [col.lower().replace(' ', '_') for col in df.columns]
-
-        # Convert date column (assuming 'month' for Finance Historical and 'date' for others)
-        if 'date' in df.columns:
-            # Assumes 'date' column is used in the main sheets, e.g., '11/5/2023'
-            df['date'] = pd.to_datetime(df['date'], errors='coerce', dayfirst=False).dt.date
         
-        # Convert amount column: remove commas and convert to numeric
-        amount_col = None
-        if 'amount' in df.columns:
-            amount_col = 'amount'
-        elif 'amount_pkr' in df.columns:
-            amount_col = 'amount_pkr'
-
-        if amount_col:
-            df[amount_col] = pd.to_numeric(
-                df[amount_col].astype(str).str.replace(',', ''), errors='coerce'
-            )
-            df[amount_col] = df[amount_col].fillna(0)
-            
-        # Clean up 'month' or 'commodities_list' (Type) for Finance Historical
+        # --- Column Mapping and Cleaning ---
+        
+        # Standardize month/date column names for the pipeline
         if 'month' in df.columns:
-            df['month'] = df['month'].astype(str).str.strip()
-        if 'commodities_list' in df.columns:
-            df['commodities_list'] = df['commodities_list'].astype(str).str.strip()
+            df.rename(columns={'month': 'month_str'}, inplace=True)
+        if 'date' in df.columns:
+            df.rename(columns={'date': 'date_str'}, inplace=True)
+
+        # Standardize amount column names
+        if 'amount' in df.columns:
+            df.rename(columns={'amount': 'amount_pkr'}, inplace=True)
             
-        return df.dropna(subset=['amount_pkr'])
+        # Standardize the commodity list column
+        if 'type' in df.columns:
+            df.rename(columns={'type': 'commodities_list'}, inplace=True)
+            
+        # Convert date columns to datetime objects (for main dashboard)
+        if 'date_str' in df.columns:
+            # We use dayfirst=False for the standard M/D/Y format
+            df['date'] = pd.to_datetime(df['date_str'], errors='coerce', dayfirst=False).dt.date
+            
+        # Convert amount column to numeric, handling commas and fill NaN with 0
+        if 'amount_pkr' in df.columns:
+            df['amount_pkr'] = pd.to_numeric(
+                df['amount_pkr'].astype(str).str.replace(',', ''), errors='coerce'
+            ).fillna(0)
+            
+        # If 'month' column is used (for Finance Historicals), we just clean it here.
+        # Conversion to datetime object (Month_DT) is handled on the page level.
+
+        # Filter out rows where essential data is missing
+        return df.dropna(how='all')
 
     except Exception as e:
-        # In a real app, you might log this error more formally
-        st.error(f"Error loading data from sheet '{sheet_name}': {e}")
+        st.error(f"Error loading data from the provided URL: {e}")
         return pd.DataFrame()
 
 
@@ -91,6 +78,11 @@ def explode_commodities(df: pd.DataFrame) -> pd.DataFrame:
     df_temp = df.copy()
     
     # 1. Clean the list string
+    # We must check if the column exists before trying to access it
+    if 'commodities_list' not in df_temp.columns or df_temp['commodities_list'].empty:
+        # If no commodities_list, return empty to prevent KeyErrors later
+        return pd.DataFrame()
+        
     df_temp['commodities_list'] = df_temp['commodities_list'].fillna('')
     
     # 2. Split the list by comma and explode
@@ -100,10 +92,6 @@ def explode_commodities(df: pd.DataFrame) -> pd.DataFrame:
     df_exploded = df_temp.explode('commodity_items')
     
     # 3. Extract the amount and commodity name
-    
-    # Regex to capture amount (first number) and the rest as commodity name
-    # e.g., '200 Edible oil' -> amount=200, name='Edible oil'
-    # This regex is robust for the format seen in the screenshot
     pattern = r'^\s*(\d+)\s*(.*)'
     
     df_exploded[['amount_split', 'commodity']] = df_exploded['commodity_items'].str.extract(pattern)
@@ -115,9 +103,6 @@ def explode_commodities(df: pd.DataFrame) -> pd.DataFrame:
     # Clean up commodity name
     df_exploded['commodity'] = df_exploded['commodity'].str.strip()
     
-    # Calculate the gross amount per commodity using the split amount as a weight.
-    # Total amount is split proportionally IF the row total is not 0
-    
     # Calculate the sum of the split amounts for normalization
     sum_split_per_txn = df_exploded.groupby(df_exploded.index)['amount_split'].transform('sum')
     
@@ -128,10 +113,6 @@ def explode_commodities(df: pd.DataFrame) -> pd.DataFrame:
         df_exploded['amount_split'] / sum_split_per_txn * df_exploded['amount_pkr'],
         df_exploded['amount_pkr'] / df_exploded.groupby(df_exploded.index)['commodity_items'].transform('count')
     )
-    
-    # Fallback: if sum_split_per_txn is 0 or amount_pkr is 0, distribute equally among items
-    # (The numpy where handles the primary case. The else clause is a simple division 
-    # for the equal distribution fallback, but the logic above should cover most proportional splits)
     
     # Final cleanup and selection
     df_final = df_exploded[df_exploded['commodity'] != ''].reset_index(drop=True)
@@ -184,7 +165,9 @@ def get_kpi_metrics(
     total_transactions = len(raw_filtered)
 
     # 4. Unique Customers
-    unique_customers = raw_filtered["customer_name"].nunique()
+    # Note: 'customer_name' column isn't present in Finance Historicals, but is safe here 
+    # as this function is primarily used by the main dashboard.
+    unique_customers = raw_filtered["customer_name"].nunique() if 'customer_name' in raw_filtered.columns else 0
     
     # 5. Top Commodity
     top_commodity = exploded_filtered.groupby("commodity")[
