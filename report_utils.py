@@ -24,27 +24,37 @@ def load_data(sheet_url: str) -> pd.DataFrame:
         df = pd.read_csv(sheet_url)
         
         # Standardize column names (to lowercase and underscores)
-        df.columns = [col.lower().replace(' ', '_') for col in df.columns]
+        df.columns = [col.lower().replace(' ', '_').replace('(', '').replace(')', '') for col in df.columns]
         
         # --- Column Mapping and Cleaning ---
         
-        # Standardize month/date column names for the pipeline
-        if 'month' in df.columns:
-            df.rename(columns={'month': 'month_str'}, inplace=True)
-        if 'date' in df.columns:
-            df.rename(columns={'date': 'date_str'}, inplace=True)
+        # 1. Map Time/Date Column: 'timestamp' -> 'date_str' -> 'date'
+        if 'timestamp' in df.columns:
+            df.rename(columns={'timestamp': 'date_str'}, inplace=True)
+            
+        # 2. Map Commodity Column: 'commodity' -> 'commodities_list'
+        # Note: Since your main sheet uses a separate 'Commodity' column and the Finance sheet
+        # uses 'Type', we map the main sheet's 'commodity' column to the expected 'commodities_list'.
+        if 'commodity' in df.columns:
+            df.rename(columns={'commodity': 'commodities_list'}, inplace=True)
+        # Handle the finance historical 'type' column (it was handled by load_data's renaming previously)
+        if 'type' in df.columns:
+            df.rename(columns={'type': 'commodities_list'}, inplace=True)
 
-        # Standardize amount column names
+        # 3. Map Amount Column: 'amount' -> 'amount_pkr'
         if 'amount' in df.columns:
             df.rename(columns={'amount': 'amount_pkr'}, inplace=True)
             
-        # Standardize the commodity list column
-        if 'type' in df.columns:
-            df.rename(columns={'type': 'commodities_list'}, inplace=True)
-            
+        # 4. Map Month Column (for historical sheet only): 'month' -> 'month_str'
+        if 'month' in df.columns:
+            df.rename(columns={'month': 'month_str'}, inplace=True)
+
+
+        # --- Final Data Type Conversions ---
+
         # Convert date columns to datetime objects (for main dashboard)
         if 'date_str' in df.columns:
-            # We use dayfirst=False for the standard M/D/Y format
+            # We convert to date object for easy comparison with datetime.date
             df['date'] = pd.to_datetime(df['date_str'], errors='coerce', dayfirst=False).dt.date
             
         # Convert amount column to numeric, handling commas and fill NaN with 0
@@ -53,9 +63,6 @@ def load_data(sheet_url: str) -> pd.DataFrame:
                 df['amount_pkr'].astype(str).str.replace(',', ''), errors='coerce'
             ).fillna(0)
             
-        # If 'month' column is used (for Finance Historicals), we just clean it here.
-        # Conversion to datetime object (Month_DT) is handled on the page level.
-
         # Filter out rows where essential data is missing
         return df.dropna(how='all')
 
@@ -165,8 +172,7 @@ def get_kpi_metrics(
     total_transactions = len(raw_filtered)
 
     # 4. Unique Customers
-    # Note: 'customer_name' column isn't present in Finance Historicals, but is safe here 
-    # as this function is primarily used by the main dashboard.
+    # Use 'customer_name' which is now standardized from 'Customer Name'
     unique_customers = raw_filtered["customer_name"].nunique() if 'customer_name' in raw_filtered.columns else 0
     
     # 5. Top Commodity
