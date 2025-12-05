@@ -2,8 +2,13 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 from datetime import datetime
-# Import load_data and explode_commodities from the report_utils.py file
 from report_utils import load_data, explode_commodities, CURRENCY_CODE, CURRENCY_FORMAT 
+
+# -----------------------------------------------------------------------------
+# DEFINE THE SHEET URL FOR FINANCE HISTORICALS (GID=156572199)
+# -----------------------------------------------------------------------------
+# Spreadsheet ID: 1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q
+FINANCE_DATA_URL = "https://docs.google.com/spreadsheets/d/1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q/gviz/tq?tqx=out:csv&gid=156572199"
 
 # -----------------------------------------------------------------------------
 # PAGE CONFIG
@@ -13,54 +18,40 @@ st.markdown("Detailed breakdown of monthly sales transactions from the 'Finance 
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# DATA LOADING (Pulls from the 'Finance Historical' tab and RENAMES columns)
+# DATA LOADING 
 # -----------------------------------------------------------------------------
 
 @st.cache_data(ttl=300, show_spinner="Loading Finance Historical Data...")
 def cached_load_finance_data():
     """
-    Load and prepare data specifically from the 'Finance Historical' Google Sheets tab.
-    This function handles the column name mapping necessary for the explode_commodities utility.
+    Load data using the direct CSV URL method. The necessary column renaming
+    is handled inside the generic load_data utility.
     """
-    # Load data from the specific sheet name. Columns will be lowercased by report_utils.py.
-    df = load_data(sheet_name="Finance Historical")
+    # Call the simplified load_data function with the specific sheet URL
+    df = load_data(sheet_url=FINANCE_DATA_URL)
     
     if df.empty:
+        st.error("No data found or data loading failed for the 'Finance Historical' tab.")
         return df
     
-    # 1. Map columns from the Finance Historical sheet to the names expected by the pipeline:
-    # 'month' is the original Month column
-    # 'amount' is the original Amount column
-    # 'type' is the original Type column
-    df.rename(columns={
-        'amount': 'amount_pkr_raw', # Store original amount before explosion
-        'type': 'commodities_list', # This column contains the grouped items
-        'month': 'month_str' # Store original month string
-    }, inplace=True)
-    
-    # Ensure the new columns exist after renaming (checking common errors)
-    if 'month_str' not in df.columns or 'amount_pkr_raw' not in df.columns or 'commodities_list' not in df.columns:
-        st.error("Error: Could not find expected columns (Month, Amount, Type) in the 'Finance Historical' tab after standardization.")
-        return pd.DataFrame()
-
-    # 2. Re-clean and ensure types are correct for the explosion process
-    df['amount_pkr'] = pd.to_numeric(df['amount_pkr_raw'], errors='coerce').fillna(0)
-    df['Month_DT'] = pd.to_datetime(df['month_str'], format='%m-%Y', errors='coerce')
-    
-    # Drop rows that failed conversion or are completely empty
-    df = df.dropna(subset=['Month_DT', 'amount_pkr']).sort_values('Month_DT')
+    # We now expect 'amount_pkr', 'commodities_list', and 'month_str' after load_data runs
+    if 'month_str' not in df.columns or 'amount_pkr' not in df.columns or 'commodities_list' not in df.columns:
+        st.error("Error: Standardized columns (Month, Amount, Type) not found. Check the sheet headers.")
+        return pd.DataFrame() 
         
+    # Calculate Month_DT here, using the 'month_str' column cleaned in report_utils
+    df['Month_DT'] = pd.to_datetime(df['month_str'], format='%m-%Y', errors='coerce')
+    df = df.dropna(subset=['Month_DT']).sort_values('Month_DT')
+    
     return df.dropna(how='all')
 
 
 df_raw_finance = cached_load_finance_data()
 
 if df_raw_finance.empty:
-    st.error("No data found or data loading failed for the 'Finance Historical' tab.")
     st.stop()
 
 # --- EXPLODE THE COMMODITIES (Separates grouped items) ---
-# Now explode_commodities receives the required 'commodities_list' and 'amount_pkr'
 exploded_df_finance = explode_commodities(df_raw_finance)
 
 st.caption(f"Data period: {exploded_df_finance['Month_DT'].min().strftime('%B %Y')} to {exploded_df_finance['Month_DT'].max().strftime('%B %Y')}")
