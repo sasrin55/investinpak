@@ -22,8 +22,8 @@ from report_utils import (
 
 # --- GOOGLE SHEET URL CONFIGURATION ---
 # Spreadsheet ID: 1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q
-# We assume the main dashboard data is on the first sheet, which has GID=0.
-MAIN_DATA_URL = "https://docs.google.com/spreadsheets/d/1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q/gviz/tq?tqx=out:csv&gid=0"
+# UPDATED: Using the verified Master Sheet GID=1702438161
+MAIN_DATA_URL = "https://docs.google.com/spreadsheets/d/1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q/gviz/tq?tqx=out:csv&gid=1702438161"
 
 # -----------------------------------------------------------------------------
 # PAGE CONFIG
