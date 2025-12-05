@@ -8,6 +8,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from zoneinfo import ZoneInfo
 
+# NOTE: This imports the updated load_data function which uses the direct CSV URL.
 from report_utils import (
     load_data,
     explode_commodities,
@@ -18,6 +19,11 @@ from report_utils import (
     CURRENCY_CODE,
     CURRENCY_FORMAT,
 )
+
+# --- GOOGLE SHEET URL CONFIGURATION ---
+# Spreadsheet ID: 1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q
+# We assume the main dashboard data is on the first sheet, which has GID=0.
+MAIN_DATA_URL = "https://docs.google.com/spreadsheets/d/1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q/gviz/tq?tqx=out:csv&gid=0"
 
 # -----------------------------------------------------------------------------
 # PAGE CONFIG
@@ -38,11 +44,19 @@ st.markdown("---")
 @st.cache_data(ttl=300, show_spinner="Connecting to Google Sheet and loading...")
 def cached_load_data():
     """
-    Load data from Google Sheets and remember when it was refreshed.
-
+    Load data from Google Sheets using the direct URL.
+    
     ttl=300 means Streamlit will reload from the Sheet at most every 5 minutes.
     """
-    df = load_data(use_cache=False)
+    # Use the simplified load_data function with the URL
+    df = load_data(sheet_url=MAIN_DATA_URL)
+    
+    # Check if necessary columns exist after loading and cleaning
+    if df.empty or 'date' not in df.columns or 'customer_name' not in df.columns:
+        st.error("Error: Main dashboard data is missing essential columns (date or customer_name). Check sheet headers or access.")
+        # Return empty data structure if load fails
+        return pd.DataFrame(), datetime.now(ZoneInfo("Asia/Karachi"))
+
     refreshed_at = datetime.now(ZoneInfo("Asia/Karachi"))
     return df, refreshed_at
 
@@ -261,8 +275,12 @@ def build_daily_email_html(
 
 
 def send_email_report(recipient_emails: list, report_date: date) -> bool:
-    """Send the HTML report email to multiple recipients using st.secrets."""
+    """
+    Send the HTML report email to multiple recipients.
+    NOTE: Requires SMTP_USER/SMTP_PASS in st.secrets to work for email.
+    """
     try:
+        # Note: This still relies on st.secrets for SMTP credentials.
         smtp_user = st.secrets["SMTP_USER"]
         smtp_pass = st.secrets["SMTP_PASS"]
         smtp_server = st.secrets.get("SMTP_SERVER", "smtp.gmail.com")
@@ -274,7 +292,12 @@ def send_email_report(recipient_emails: list, report_date: date) -> bool:
         return False
 
     try:
+        # Load the raw data using the cached function
         raw_df_local, _ = cached_load_data()
+        if raw_df_local.empty:
+            st.error("Cannot send email: Data load failed.")
+            return False
+            
         exploded_df_local = explode_commodities(raw_df_local)
 
         today_metrics = get_kpi_metrics(
@@ -324,7 +347,7 @@ refresh_col, _ = st.columns([1, 4])
 with refresh_col:
     if st.button("Refresh data from Google Sheet"):
         cached_load_data.clear()
-        st.rerun() # FIXED: Changed st.experimental_rerun() to st.rerun()
+        st.rerun()
 
 raw_df, refreshed_at = cached_load_data()
 exploded_df = explode_commodities(raw_df)
@@ -660,11 +683,12 @@ data_choice = st.selectbox(
 
 if data_choice == "Raw Transactions (Total Amount)":
     st.subheader("Raw Transaction Data")
+    # Note: 'date' column is now an object of type date, not a string
     df_display = raw_df_filtered.sort_values("date", ascending=False).drop(
         columns=["phone"], errors="ignore"
     )
     df_display.rename(
-        columns={"amount_pkr": f"Gross Amount ({CURRENCY_CODE})"}, inplace=True
+        columns={"amount_pkr": f"Gross Amount ({CURRENCY_CODE})", "commodities_list": "Commodity List"}, inplace=True
     )
     styled_df = df_display.style.format(
         {f"Gross Amount ({CURRENCY_CODE})": f"{CURRENCY_CODE} {{:,.0f}}"}
