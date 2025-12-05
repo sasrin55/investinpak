@@ -24,24 +24,24 @@ def load_data(sheet_url: str) -> pd.DataFrame:
         df = pd.read_csv(sheet_url)
         
         # Standardize column names (to lowercase and underscores)
+        # This handles: "Customer Name" -> "customer_name"
         df.columns = [col.lower().replace(' ', '_').replace('(', '').replace(')', '') for col in df.columns]
         
         # --- Column Mapping and Cleaning ---
         
-        # 1. Map Time/Date Column: 'timestamp' -> 'date_str' -> 'date'
+        # 1. Map Time/Date Column: 'timestamp' -> 'date_str'
+        # This fixes the issue for the Master Sheet where we need 'date' for filtering.
         if 'timestamp' in df.columns:
             df.rename(columns={'timestamp': 'date_str'}, inplace=True)
             
-        # 2. Map Commodity Column: 'commodity' -> 'commodities_list'
-        # Note: Since your main sheet uses a separate 'Commodity' column and the Finance sheet
-        # uses 'Type', we map the main sheet's 'commodity' column to the expected 'commodities_list'.
+        # 2. Map Commodity Column: 'commodity' -> 'commodities_list' (Master Sheet)
         if 'commodity' in df.columns:
             df.rename(columns={'commodity': 'commodities_list'}, inplace=True)
-        # Handle the finance historical 'type' column (it was handled by load_data's renaming previously)
+        # Handle 'type' column (Finance Historicals Sheet)
         if 'type' in df.columns:
             df.rename(columns={'type': 'commodities_list'}, inplace=True)
 
-        # 3. Map Amount Column: 'amount' -> 'amount_pkr'
+        # 3. Map Amount Column: 'amount' -> 'amount_pkr' (Fixes potential spelling/casing issues)
         if 'amount' in df.columns:
             df.rename(columns={'amount': 'amount_pkr'}, inplace=True)
             
@@ -83,13 +83,18 @@ def explode_commodities(df: pd.DataFrame) -> pd.DataFrame:
         pd.DataFrame: A new dataframe with one row per commodity.
     """
     df_temp = df.copy()
-    
+
+    # --- START SAFETY CHECK ---
+    # If the required columns are missing, return an empty dataframe immediately
+    required_cols = ['commodities_list', 'amount_pkr']
+    if not all(col in df_temp.columns for col in required_cols):
+        # We need these columns to exist for the rest of the dashboard code to run
+        return pd.DataFrame(columns=required_cols)
+
+    if df_temp['commodities_list'].empty:
+         return pd.DataFrame(columns=df_temp.columns)
+
     # 1. Clean the list string
-    # We must check if the column exists before trying to access it
-    if 'commodities_list' not in df_temp.columns or df_temp['commodities_list'].empty:
-        # If no commodities_list, return empty to prevent KeyErrors later
-        return pd.DataFrame()
-        
     df_temp['commodities_list'] = df_temp['commodities_list'].fillna('')
     
     # 2. Split the list by comma and explode
@@ -122,8 +127,24 @@ def explode_commodities(df: pd.DataFrame) -> pd.DataFrame:
     )
     
     # Final cleanup and selection
-    df_final = df_exploded[df_exploded['commodity'] != ''].reset_index(drop=True)
+    # We explicitly select all columns from the original df plus the new ones
+    original_cols = list(df.columns)
+    new_cols = ['commodity', 'gross_amount_per_commodity']
     
+    # Filter out rows where commodity name is empty
+    df_final = df_exploded[df_exploded['commodity'] != '']
+    
+    # Select original columns + new calculation columns
+    final_col_selection = original_cols + [col for col in new_cols if col in df_final.columns and col not in original_cols]
+    
+    df_final = df_final[final_col_selection].reset_index(drop=True)
+    
+    # --- END SAFETY CHECK ---
+
+    # Final check for 'date' column presence (since it's critical for the app logic)
+    if 'date' not in df_final.columns:
+        st.warning("Warning: The 'date' column is missing from the final exploded data, affecting time-based filtering.")
+        
     return df_final
 
 
