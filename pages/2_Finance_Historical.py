@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 from datetime import datetime
-from report_utils import load_data, explode_commodities, CURRENCY_CODE, CURRENCY_FORMAT 
+from report_utils import load_data, explode_commodities, CURRENCY_CODE, CURRENCY_FORMAT, metric_format
 
 # -----------------------------------------------------------------------------
 # DEFINE THE SHEET URL FOR FINANCE HISTORICALS (GID=156572199)
@@ -13,8 +13,8 @@ FINANCE_DATA_URL = "https://docs.google.com/spreadsheets/d/1kTy_-jB_cPfvXN-Lqe9W
 # -----------------------------------------------------------------------------
 # PAGE CONFIG
 # -----------------------------------------------------------------------------
-st.title("Finance Historicals")
-st.markdown("Detailed breakdown of monthly sales transactions from the 'Finance Historical' sheet, **separated by commodity**.")
+st.title("Finance Historicals: Full Trend Analysis")
+st.markdown("Overview of all recorded sales, grouped by month and broken down by individual commodity.")
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
@@ -24,10 +24,8 @@ st.markdown("---")
 @st.cache_data(ttl=300, show_spinner="Loading Finance Historical Data...")
 def cached_load_finance_data():
     """
-    Load data using the direct CSV URL method. The necessary column renaming
-    is handled inside the generic load_data utility.
+    Load data using the direct CSV URL method.
     """
-    # Call the simplified load_data function with the specific sheet URL
     df = load_data(sheet_url=FINANCE_DATA_URL)
     
     if df.empty:
@@ -54,38 +52,50 @@ if df_raw_finance.empty:
 # --- EXPLODE THE COMMODITIES (Separates grouped items) ---
 exploded_df_finance = explode_commodities(df_raw_finance)
 
-st.caption(f"Data period: {exploded_df_finance['Month_DT'].min().strftime('%B %Y')} to {exploded_df_finance['Month_DT'].max().strftime('%B %Y')}")
+# Ensure the exploded DataFrame has the Month_DT column for grouping
+if 'Month_DT' not in exploded_df_finance.columns:
+     exploded_df_finance = exploded_df_finance.merge(
+         df_raw_finance[['month_str', 'Month_DT']], 
+         on='month_str', 
+         how='left'
+     ).drop_duplicates()
 
 # -----------------------------------------------------------------------------
-# FILTERS
+# GLOBAL METRICS AND KPIS (All Time)
 # -----------------------------------------------------------------------------
 
-unique_months = sorted(df_raw_finance['month_str'].unique(), key=lambda x: datetime.strptime(x, '%m-%Y'), reverse=True)
-selected_month = st.selectbox("Select Month for Detail View:", options=unique_months, index=0)
+st.header("Financial Overview (All Time)")
 
-# Filter the EXPLODED dataframe based on the selected month
-df_filtered_exploded = exploded_df_finance[exploded_df_finance['month_str'] == selected_month].copy()
-# Filter the RAW dataframe for KPI calculations that need total transaction counts
-df_filtered_raw = df_raw_finance[df_raw_finance['month_str'] == selected_month].copy() 
+total_sales = df_raw_finance['amount_pkr'].sum() 
+transaction_count = len(df_raw_finance)
+unique_commodities = exploded_df_finance['commodity'].nunique() 
 
-# -----------------------------------------------------------------------------
-# METRICS AND KPIS 
-# -----------------------------------------------------------------------------
+# Calculate Highest Selling Month
+monthly_sales_summary = df_raw_finance.groupby('Month_DT')['amount_pkr'].sum().reset_index()
+if not monthly_sales_summary.empty:
+    highest_month_row = monthly_sales_summary.loc[monthly_sales_summary['amount_pkr'].idxmax()]
+    highest_selling_month = highest_month_row['Month_DT'].strftime('%b %Y')
+    highest_selling_amount = metric_format(highest_month_row['amount_pkr'])
+else:
+    highest_selling_month = "N/A"
+    highest_selling_amount = "N/A"
 
-st.header("Monthly Summary")
-total_sales = df_filtered_raw['amount_pkr'].sum() 
-transaction_count = len(df_filtered_raw)
-unique_commodities = df_filtered_exploded['commodity'].nunique() 
-
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.metric(f"**Total Sales ({selected_month})**", 
-              f"{CURRENCY_CODE} {total_sales:,.0f}")
+    st.metric("**Total Sales (All Time)**", 
+              metric_format(total_sales))
 with col2:
     st.metric("**Total Transactions**", transaction_count)
 with col3:
     st.metric("**Unique Commodities Sold**", unique_commodities)
+with col4:
+    st.metric(
+        "**Highest Selling Month**", 
+        highest_selling_month,
+        delta=highest_selling_amount,
+        delta_color="normal"
+    )
 
 st.markdown("---")
 
@@ -93,13 +103,10 @@ st.markdown("---")
 # TIME SERIES CHART (All Months)
 # -----------------------------------------------------------------------------
 
-st.header("Sales Trend Over Time")
-
-monthly_sales = df_raw_finance.groupby('Month_DT')['amount_pkr'].sum().reset_index()
-monthly_sales['Month_Label'] = monthly_sales['Month_DT'].dt.strftime('%Y-%m')
+st.header("Total Sales Trend Over Time")
 
 chart = (
-    alt.Chart(monthly_sales)
+    alt.Chart(monthly_sales_summary)
     .mark_line(point=True, color='#006B3F')
     .encode(
         x=alt.X('Month_DT:T', title='Month', axis=alt.Axis(format='%Y-%m')),
@@ -110,7 +117,7 @@ chart = (
             alt.Tooltip('amount_pkr:Q', title='Sales Amount', format=CURRENCY_FORMAT),
         ],
     )
-    .properties(title="Total Monthly Sales Trend")
+    .properties(title="Total Monthly Sales Trend (All Available Data)")
     .interactive()
 )
 st.altair_chart(chart, use_container_width=True)
@@ -118,61 +125,83 @@ st.altair_chart(chart, use_container_width=True)
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# COMMODITY MIX (Monthly) 
+# COMMODITY MIX & SEASONALITY 
 # -----------------------------------------------------------------------------
 
-st.header(f"Commodity Breakdown ({selected_month})")
+st.header("Commodity Performance & Seasonality")
 
-# Group by the separated 'commodity' column
+# Group by the separated 'commodity' column for overall ranking
 commodity_summary = (
-    df_filtered_exploded.groupby('commodity')['gross_amount_per_commodity']
+    exploded_df_finance.groupby('commodity')['gross_amount_per_commodity']
     .sum()
     .reset_index()
     .rename(columns={'gross_amount_per_commodity': 'Total_Amount'})
     .sort_values('Total_Amount', ascending=False)
 )
 
-col_chart, col_table = st.columns([2, 1])
-
-with col_chart:
-    st.subheader("Sales by Individual Commodity")
-    
-    if not commodity_summary.empty:
-        pie_chart = (
-            alt.Chart(commodity_summary)
-            .mark_arc(outerRadius=120)
-            .encode(
-                theta=alt.Theta("Total_Amount", stack=True),
-                color=alt.Color("commodity", title="Commodity"), 
-                order=alt.Order("Total_Amount", sort="descending"),
-                tooltip=["commodity", 
-                         alt.Tooltip("Total_Amount", title="Sales Amount", format=CURRENCY_FORMAT)],
-            )
-            .properties(title=f"Sales Distribution for {selected_month}")
-        )
-        st.altair_chart(pie_chart, use_container_width=True)
-    else:
-        st.info(f"No commodity data found for {selected_month}.")
+col_chart, col_table = st.columns([3, 2])
 
 with col_table:
-    st.subheader("Detail Table")
+    st.subheader("Commodity Ranking (All Time)")
+    # Format the table for display
     styled_df = commodity_summary.style.format(
         {"Total_Amount": f"{CURRENCY_CODE} {{:,.0f}}"}
     ).hide(axis="index")
     
-    st.dataframe(styled_df, use_container_width=True)
+    st.dataframe(styled_df, use_container_width=True, height=500)
+
+with col_chart:
+    st.subheader("Top 5 Commodity Monthly Trends")
+    
+    # 1. Identify Top 5 Commodities for charting
+    top_5_commodities = commodity_summary['commodity'].head(5).tolist()
+
+    # 2. Filter exploded data to include only Top 5
+    seasonality_df = exploded_df_finance[
+        exploded_df_finance['commodity'].isin(top_5_commodities)
+    ].copy()
+    
+    # 3. Group by Month and Commodity
+    monthly_commodity_sales = (
+        seasonality_df.groupby(['Month_DT', 'commodity'])['gross_amount_per_commodity']
+        .sum()
+        .reset_index()
+        .rename(columns={'gross_amount_per_commodity': 'Monthly_Sales'})
+    )
+
+    if not monthly_commodity_sales.empty:
+        seasonality_chart = (
+            alt.Chart(monthly_commodity_sales)
+            .mark_line(point=True)
+            .encode(
+                x=alt.X('Month_DT:T', title='Month', axis=alt.Axis(format='%Y-%m')),
+                y=alt.Y('Monthly_Sales:Q', title=f"Sales ({CURRENCY_CODE})", 
+                        axis=alt.Axis(format=CURRENCY_FORMAT)),
+                color='commodity:N',
+                tooltip=[
+                    alt.Tooltip('Month_DT:T', title='Month', format='%Y-%m'),
+                    alt.Tooltip('commodity:N', title='Commodity'),
+                    alt.Tooltip('Monthly_Sales:Q', title='Sales', format=CURRENCY_FORMAT),
+                ],
+            )
+            .properties(title="Monthly Sales Trend for Top 5 Commodities")
+            .interactive()
+        )
+        st.altair_chart(seasonality_chart, use_container_width=True)
+    else:
+        st.info("Not enough data to chart monthly commodity trends.")
 
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# RAW DATA EXPLORER (Monthly)
+# RAW DATA EXPLORER 
 # -----------------------------------------------------------------------------
 
-st.header(f"Raw Transaction Data Explorer ({selected_month})")
-st.caption("This table shows the raw, un-exploded transactions from the spreadsheet row.")
+st.header("Raw Transaction Data Explorer")
+st.caption("Showing all transactions from the 'Finance Historical' spreadsheet row.")
 
 # Prepare the RAW data for display
-df_display = df_filtered_raw[['month_str', 'amount_pkr', 'commodities_list']].copy()
+df_display = df_raw_finance[['month_str', 'amount_pkr', 'commodities_list']].copy()
 df_display.rename(
     columns={
         'month_str': 'Month',
@@ -186,4 +215,4 @@ styled_df = df_display.style.format(
     {f"Gross Amount ({CURRENCY_CODE})": f"{CURRENCY_CODE} {{:,.0f}}"}
 ).hide(axis="index")
 
-st.dataframe(styled_df, use_container_width=True)
+st.dataframe(styled_df, use_container_width=True, height=500)
