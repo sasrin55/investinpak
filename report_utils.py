@@ -38,8 +38,7 @@ def load_data(sheet_url: str) -> pd.DataFrame:
         if "timestamp" in df.columns:
             df.rename(columns={"timestamp": "date_str"}, inplace=True)
 
-        # 2) Commodity columns -> commodities_list
-        #    (master sheet: "commodity"; finance sheet: "type")
+        # 2) Commodity / type -> commodities_list
         if "commodity" in df.columns:
             df.rename(columns={"commodity": "commodities_list"}, inplace=True)
         if "type" in df.columns and "commodities_list" not in df.columns:
@@ -56,9 +55,13 @@ def load_data(sheet_url: str) -> pd.DataFrame:
         # --- Type conversions ---
 
         # Convert date_str -> date (python date object)
+        # Your sheet uses DD-MM-YYYY / D/M/YYYY formats, so we use dayfirst=True
         if "date_str" in df.columns:
             df["date"] = pd.to_datetime(
-                df["date_str"], errors="coerce", dayfirst=False
+                df["date_str"],
+                errors="coerce",
+                dayfirst=True,
+                infer_datetime_format=True,
             ).dt.date
 
         # Convert amount_pkr to numeric, stripping commas
@@ -98,11 +101,10 @@ def explode_commodities(df: pd.DataFrame) -> pd.DataFrame:
     # Ensure the app never crashes if columns are missing:
     required_cols = ["commodities_list", "amount_pkr"]
     if not all(col in df_temp.columns for col in required_cols):
-        # Return an empty dataframe with all original columns plus expected new ones
         empty_cols = original_cols + ["commodity", "gross_amount_per_commodity"]
         return pd.DataFrame(columns=empty_cols)
 
-    # Handle case where list column exists but is entirely empty
+    # If list column exists but is entirely empty, return empty with schema
     if df_temp["commodities_list"].isna().all():
         empty_cols = original_cols + ["commodity", "gross_amount_per_commodity"]
         return pd.DataFrame(columns=empty_cols)
@@ -130,13 +132,9 @@ def explode_commodities(df: pd.DataFrame) -> pd.DataFrame:
     df_exploded["commodity"] = df_exploded["commodity"].astype(str).str.strip()
 
     # 4. Compute proportional split of transaction amount across commodities
-    # Sum split amounts per original transaction (by index)
     sum_split_per_txn = df_exploded.groupby(df_exploded.index)[
         "amount_split"
     ].transform("sum")
-
-    # Where parsing succeeded: use proportional allocation of amount_pkr
-    # Else: evenly split amount_pkr across commodity_items count
     count_items_per_txn = df_exploded.groupby(df_exploded.index)[
         "commodity_items"
     ].transform("count")
@@ -156,15 +154,12 @@ def explode_commodities(df: pd.DataFrame) -> pd.DataFrame:
 
     # 6. Keep all original columns + new ones
     new_cols = ["commodity", "gross_amount_per_commodity"]
-    final_cols = original_cols + [
-        col for col in new_cols if col not in original_cols
-    ]
+    final_cols = original_cols + [col for col in new_cols if col not in original_cols]
 
     df_final = df_final[final_cols].reset_index(drop=True)
 
     # Final check for 'date' column presence (apps rely on this)
     if "date" not in df_final.columns:
-        # Not fatal, but warn once so you know data won't be time-filterable
         st.warning(
             "Warning: The 'date' column is missing from the exploded data. "
             "Time-based filters and KPIs will not work correctly for this dataset."
@@ -232,21 +227,24 @@ def get_kpi_metrics(
     )
 
     # 5. Top Commodity
-    top_commodity_series = (
-        exploded_filtered.groupby("commodity")["gross_amount_per_commodity"].sum()
-        if not exploded_filtered.empty and "commodity" in exploded_filtered.columns
-        else pd.Series(dtype=float)
-    )
+    if (
+        not exploded_filtered.empty
+        and "commodity" in exploded_filtered.columns
+        and "gross_amount_per_commodity" in exploded_filtered.columns
+    ):
+        top_commodity_series = exploded_filtered.groupby("commodity")[
+            "gross_amount_per_commodity"
+        ].sum()
+    else:
+        top_commodity_series = pd.Series(dtype=float)
 
     top_commodity_name = "N/A"
     top_commodity_amount = "0"
 
     if not top_commodity_series.empty:
-        top_value = top_commodity_series.sort_values(ascending=False).iloc[0]
-        top_commodity_name = top_commodity_series.sort_values(
-            ascending=False
-        ).index[0]
-        top_commodity_amount = metric_format(top_value)
+        top_sorted = top_commodity_series.sort_values(ascending=False)
+        top_commodity_name = top_sorted.index[0]
+        top_commodity_amount = metric_format(top_sorted.iloc[0])
 
     return {
         "df": exploded_filtered,
