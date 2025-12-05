@@ -24,8 +24,10 @@ st.markdown("---")
 @st.cache_data(ttl=300, show_spinner="Loading Finance Historical Data...")
 def cached_load_finance_data():
     """
-    Load data using the direct CSV URL method.
+    Load data using the direct CSV URL method. The necessary column renaming
+    is handled inside the generic load_data utility.
     """
+    # Call the simplified load_data function with the specific sheet URL
     df = load_data(sheet_url=FINANCE_DATA_URL)
     
     if df.empty:
@@ -98,6 +100,72 @@ with col4:
     )
 
 st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# MONTHLY CALENDAR TABLE (New Feature)
+# -----------------------------------------------------------------------------
+
+st.header("Monthly Top Commodity Performance")
+st.markdown("Shows the top-selling commodity each month and its sales percentage of the total monthly revenue.")
+
+if exploded_df_finance.empty:
+    st.info("No sales data available for detailed monthly breakdown.")
+else:
+    # 1. Calculate commodity sales per month
+    monthly_commodity_sales = exploded_df_finance.groupby(['Month_DT', 'commodity'])[
+        'gross_amount_per_commodity'
+    ].sum().reset_index().rename(columns={'gross_amount_per_commodity': 'Commodity_Sales'})
+
+    # 2. Find the top commodity (index of max sales) within each month
+    idx_max = monthly_commodity_sales.groupby(['Month_DT'])['Commodity_Sales'].idxmax()
+    top_commodity_by_month = monthly_commodity_sales.loc[idx_max].reset_index(drop=True)
+
+    # 3. Get the total monthly sales (using the raw data for accurate row totals)
+    total_sales_monthly = df_raw_finance.groupby('Month_DT')[
+        'amount_pkr'
+    ].sum().reset_index().rename(columns={'amount_pkr': 'Total_Monthly_Sales'})
+
+    # 4. Merge top commodity data with total sales data
+    calendar_df = top_commodity_by_month.merge(
+        total_sales_monthly,
+        on='Month_DT',
+        how='left'
+    )
+
+    # 5. Calculate percentage
+    calendar_df['% of Total'] = (
+        calendar_df['Commodity_Sales'] / calendar_df['Total_Monthly_Sales']
+    )
+
+    # 6. Format the final table
+    calendar_df['Month'] = calendar_df['Month_DT'].dt.strftime('%Y-%m')
+    
+    final_calendar_df = calendar_df[[
+        'Month', 
+        'Total_Monthly_Sales', 
+        'commodity', 
+        'Commodity_Sales', 
+        '% of Total'
+    ]].sort_values('Month', ascending=False)
+    
+    final_calendar_df.columns = [
+        'Month', 
+        f'Total Sales ({CURRENCY_CODE})', 
+        'Top Commodity', 
+        f'Top Commodity Sales ({CURRENCY_CODE})', 
+        'Top % of Total'
+    ]
+
+    styled_calendar_df = final_calendar_df.style.format({
+        f'Total Sales ({CURRENCY_CODE})': f"{CURRENCY_CODE} {{:,.0f}}",
+        f'Top Commodity Sales ({CURRENCY_CODE})': f"{CURRENCY_CODE} {{:,.0f}}",
+        'Top % of Total': "{:.1%}",
+    }).hide(axis="index")
+
+    st.dataframe(styled_calendar_df, use_container_width=True)
+
+st.markdown("---")
+
 
 # -----------------------------------------------------------------------------
 # TIME SERIES CHART (All Months)
