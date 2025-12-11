@@ -168,7 +168,7 @@ col2.metric("Total Transactions", f"{total_txns:,}")
 col3.metric("Unique Customers (by Phone)", f"{unique_customers:,}")
 
 
-# ---------- CUSTOMER RETENTION METRIC (New Feature) ----------
+# ---------- CUSTOMER RETENTION METRIC ----------
 
 if CUSTOMER_TYPE_COL in raw_df.columns and AMOUNT_COL in raw_df.columns:
     st.header("Customer Lifetime Value & Retention")
@@ -337,7 +337,7 @@ if "date" in exploded_df.columns and "commodity" in exploded_df.columns:
     st.header("Commodity Seasonality Analysis")
     st.caption("Monthly sales trends to identify peak selling seasons.")
     
-    # Ensure 'date' is a datetime object for resampling
+    # Ensure 'date' is a datetime object for resampling (Fix for AttributeError)
     seasonality_df = exploded_df.copy()
     seasonality_df['date'] = pd.to_datetime(seasonality_df['date'])
 
