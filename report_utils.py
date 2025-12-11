@@ -3,73 +3,25 @@ import pandas as pd
 import numpy as np
 from datetime import date
 from typing import Dict, Any
-from urllib.parse import urlparse, parse_qs # Step 1: Add new import
 
 # --- CONSTANTS ---
 CURRENCY_CODE = "PKR"
 CURRENCY_FORMAT = ",.0f"  # e.g., 10,000
 
 
-# --- DATA LOADING HELPERS ---
-
-def normalize_gsheet_url(sheet_url: str) -> str: # Step 2: Add helper function
-    """
-    Converts a normal Google Sheets URL (edit URL) into a direct CSV export URL.
-    If the URL is already a CSV URL or a non-Google URL, it is returned as-is.
-    """
-    if not sheet_url:
-        return sheet_url
-
-    # If it's already an export CSV link, just return it
-    if "export?format=csv" in sheet_url:
-        return sheet_url
-
-    if "docs.google.com/spreadsheets" in sheet_url:
-        parsed = urlparse(sheet_url)
-        path_parts = parsed.path.split("/")
-
-        file_id = None
-        for i, part in enumerate(path_parts):
-            if part == "d" and i + 1 < len(path_parts):
-                file_id = path_parts[i + 1]
-                break
-
-        # default gid to 0 if missing
-        query = parse_qs(parsed.query)
-        # Prioritize gid from the original query parameters
-        gid = query.get("gid", ["0"])[0] 
-        
-        # Check for fragment gid if it's an edit URL (like the one provided)
-        if "#gid" in parsed.fragment:
-            fragment_query = parse_qs(parsed.fragment.lstrip('#'))
-            gid = fragment_query.get("gid", [gid])[0]
-
-        if file_id:
-            return f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=csv&gid={gid}"
-
-    # Fallback: return unchanged
-    return sheet_url
-
+# --- DATA LOADING AND CLEANING (Streamlined) ---
 
 @st.cache_data(ttl=300)
-def load_data(sheet_url: str) -> pd.DataFrame: # Step 3: Replace existing load_data
+def load_data(sheet_url: str) -> pd.DataFrame:
     """
-    Loads data from a Google Sheet (edit URL or CSV URL) and normalises it
-    for the 'Master for SalesOps' structure:
-      - Date          -> date_str / date
-      - Customer      -> customer_name
-      - Customer type -> customer_type
-      - Commodity     -> commodities_list
-      - Amount        -> amount_pkr
-      - Duration      -> duration (left as-is)
+    Loads data directly from the CSV export URL and maps the Master for SalesOps
+    column structure to the application's required structure.
     """
     try:
-        # Convert a normal Google Sheets URL into a CSV export URL automatically
-        csv_url = normalize_gsheet_url(sheet_url)
+        # 1. Load data directly from the explicit CSV export URL
+        df = pd.read_csv(sheet_url)
 
-        df = pd.read_csv(csv_url)
-
-        # Standardize column names (lowercase + underscores, no parentheses)
+        # 2. Standardize column names (lowercase + underscores)
         df.columns = [
             col.lower()
             .replace(" ", "_")
@@ -78,63 +30,43 @@ def load_data(sheet_url: str) -> pd.DataFrame: # Step 3: Replace existing load_d
             for col in df.columns
         ]
 
-        renames = {}
-
-        # Date column (from 'Master for SalesOps' -> "date")
-        if "date" in df.columns:
-            renames["date"] = "date_str"
-        if "start_date" in df.columns and "date_str" not in renames and "date_str" not in df.columns:
-            renames["start_date"] = "date_str"
-        if "timestamp" in df.columns and "date_str" not in renames and "date_str" not in df.columns:
-            renames["timestamp"] = "date_str"
-
-        # Customer -> customer_name (The phone number)
-        if "customer" in df.columns:
-            renames["customer"] = "customer_name"
-
-        # Commodity -> commodities_list (used by explode_commodities)
-        if "commodity" in df.columns:
-            renames["commodity"] = "commodities_list"
-
-        # Amount -> amount_pkr (numeric sales amount)
-        if "amount" in df.columns:
-            renames["amount"] = "amount_pkr"
-
-        # Month -> month_str (for historical sheets, optional)
-        if "month" in df.columns:
-            renames["month"] = "month_str"
-            
-        # The 'customer_type' column does not need a rename as 'customer_type' is already the clean name
-
-        # Apply all renames
-        if renames:
-            df.rename(columns=renames, inplace=True)
-
-        # ---- Type conversions ----
-
-        # date_str -> date (python date object)
+        # 3. Create a dictionary to map the standardized headers to app variables
+        column_map = {
+            "date": "date_str",             # Date -> date_str (for parsing)
+            "customer": "customer_name",    # Customer (Phone #) -> customer_name
+            "commodity": "commodities_list",# Commodity -> commodities_list (for exploding)
+            "amount": "amount_pkr",         # Amount -> amount_pkr (for sales metrics)
+            "customer_type": "customer_type", # No rename needed
+        }
+        
+        # We need to map only existing columns
+        df.rename(columns={k: v for k, v in column_map.items() if k in df.columns}, inplace=True)
+        
+        # 4. Type conversions
+        
+        # Convert date_str -> date (python date object)
         if "date_str" in df.columns:
             df["date"] = pd.to_datetime(
                 df["date_str"],
                 errors="coerce",
-                dayfirst=True,
-                infer_datetime_format=True,
+                dayfirst=True, # Critical for D/M/Y format
             ).dt.date
 
-        # Ensure amount_pkr is numeric
+        # Convert amount_pkr to numeric
         if "amount_pkr" in df.columns:
             df["amount_pkr"] = pd.to_numeric(
                 df["amount_pkr"].astype(str).str.replace(",", ""),
                 errors="coerce",
             ).fillna(0)
 
-        # Drop fully empty rows
+        # 5. Drop fully empty rows
         df = df.dropna(how="all")
 
         return df
 
     except Exception as e:
-        st.error(f"Error loading data from the provided URL: {e}")
+        # This will now clearly display the load error in the Streamlit logs
+        st.error(f"FATAL: Error loading data from the CSV URL: {e}")
         return pd.DataFrame()
 
 
@@ -152,12 +84,10 @@ def explode_commodities(df: pd.DataFrame) -> pd.DataFrame:
         empty_cols = original_cols + ["commodity", "gross_amount_per_commodity"]
         return pd.DataFrame(columns=empty_cols)
 
-    # If list column exists but is entirely empty, return empty with schema
     if df_temp["commodities_list"].isna().all():
         empty_cols = original_cols + ["commodity", "gross_amount_per_commodity"]
         return pd.DataFrame(columns=empty_cols)
 
-    # 1. Clean the list string
     df_temp["commodities_list"] = df_temp["commodities_list"].fillna("")
 
     # 2. Split the list by comma and explode
@@ -176,7 +106,6 @@ def explode_commodities(df: pd.DataFrame) -> pd.DataFrame:
         df_exploded["amount_split"], errors="coerce"
     ).fillna(0)
 
-    # Clean commodity text
     df_exploded["commodity"] = df_exploded["commodity"].astype(str).str.strip()
 
     # 4. Compute proportional split of transaction amount across commodities
@@ -206,7 +135,6 @@ def explode_commodities(df: pd.DataFrame) -> pd.DataFrame:
 
     df_final = df_final[final_cols].reset_index(drop=True)
 
-    # Final check for 'date' column presence (apps rely on this)
     if "date" not in df_final.columns:
         st.warning(
             "Warning: The 'date' column is missing from the exploded data. "
@@ -216,7 +144,7 @@ def explode_commodities(df: pd.DataFrame) -> pd.DataFrame:
     return df_final
 
 
-# --- METRIC HELPERS ---
+# [The rest of the metric helper functions remain unchanged]
 
 def metric_format(value: float) -> str:
     """Formats a float as a currency string with 0 decimal places."""
@@ -245,7 +173,6 @@ def get_kpi_metrics(
 ) -> Dict[str, Any]:
     """
     Calculates key performance indicators for a given date range.
-    Uses 'customer_name' (which holds the phone number) for unique customer count.
     """
     # 1. Filter the dataframes
     if "date" in raw_df.columns:
