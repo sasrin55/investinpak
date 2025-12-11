@@ -15,11 +15,14 @@ CURRENCY_FORMAT = ",.0f"  # e.g., 10,000
 def load_data(sheet_url: str) -> pd.DataFrame:
     """
     Loads data directly from the CSV export URL of a public Google Sheet.
+    
+    This function handles the new column names from the 'Master for SalesOps' sheet
+    and standardizes them for the application.
     """
     try:
         df = pd.read_csv(sheet_url)
 
-        # Standardize column names (lowercase + underscores, no parentheses)
+        # 1. Standardize column names (lowercase + underscores, no parentheses)
         df.columns = [
             col.lower()
             .replace(" ", "_")
@@ -28,43 +31,33 @@ def load_data(sheet_url: str) -> pd.DataFrame:
             for col in df.columns
         ]
 
-        # --- Column mapping / normalisation for the new 'Master for SalesOps' sheet ---
+        # 2. Rename new/clean headers to application-required variable names
         renames = {}
         
-        # Map 'date' (from new sheet) to 'date_str' for date processing
+        # Map 'date' (from new sheet header) -> 'date_str' for date processing
         if "date" in df.columns:
             renames["date"] = "date_str"
         
-        # Map 'customer' (B) to 'customer_name'
+        # Map 'customer' (which holds the Phone Number) -> 'customer_name'
         if "customer" in df.columns:
             renames["customer"] = "customer_name"
             
-        # Map 'customer_type' (C) to its final clean name
-        # The existing code expects 'customer_type', so no further rename needed here
-        
-        # Map 'commodity' (D) to 'commodities_list' for the explode function
+        # Map 'commodity' -> 'commodities_list' for the explode function
         if "commodity" in df.columns:
             renames["commodity"] = "commodities_list"
 
-        # Map 'amount' (E) to 'amount_pkr' for sales calcs
+        # Map 'amount' -> 'amount_pkr' for sales calcs
         if "amount" in df.columns:
             renames["amount"] = "amount_pkr"
 
-        # Perform renames
         if renames:
             df.rename(columns=renames, inplace=True)
         
-        # --- Original, general renaming logic follows (now updated to use the new names):
-        
-        # 1) Time column -> date_str
+        # --- Other Renaming/Legacy (Keep for safety) ---
         if "timestamp" in df.columns:
             df.rename(columns={"timestamp": "date_str"}, inplace=True)
-
-        # 2) Commodity / type -> commodities_list
         if "type" in df.columns and "commodities_list" not in df.columns:
             df.rename(columns={"type": "commodities_list"}, inplace=True)
-
-        # 4) Month column (for historical sheet) -> month_str
         if "month" in df.columns:
             df.rename(columns={"month": "month_str"}, inplace=True)
 
@@ -203,6 +196,7 @@ def get_kpi_metrics(
 ) -> Dict[str, Any]:
     """
     Calculates key performance indicators for a given date range.
+    Uses 'customer_name' (which holds the phone number) for unique customer count.
     """
     # 1. Filter the dataframes
     if "date" in raw_df.columns:
@@ -225,7 +219,7 @@ def get_kpi_metrics(
     # 3. Total Transactions
     total_transactions = len(raw_filtered)
 
-    # 4. Unique Customers
+    # 4. Unique Customers (Determined by phone number, stored in 'customer_name' column)
     unique_customers = (
         raw_filtered["customer_name"].nunique()
         if "customer_name" in raw_filtered.columns
