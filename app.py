@@ -19,6 +19,9 @@ GROSS_AMOUNT_PER_COMMODITY_COL = "gross_amount_per_commodity"
 COMMODITIES_COL = "commodities_list"
 AMOUNT_COL = "amount_pkr"
 CUSTOMER_COL = "customer_name"
+CURRENCY_CODE = "PKR"
+CURRENCY_FORMAT = ",.0f" # For formatting PKR values
+AVG_FORMAT = ",.2f" # For formatting average spend
 
 # ---------- CONFIG ----------
 
@@ -81,7 +84,7 @@ def explode_commodities(df: pd.DataFrame) -> pd.DataFrame:
     # Define final columns to keep
     final_cols = [
         "date", CUSTOMER_COL, CUSTOMER_TYPE_COL, "duration", 
-        "commodity", GROSS_AMOUNT_PER_COMMODITY_COL
+        "commodity", GROSS_AMOUNT_PER_COMMODITY_COL, AMOUNT_COL
     ]
 
     return df_final[final_cols].reset_index(drop=True)
@@ -160,16 +163,65 @@ unique_customers = raw_df["customer"].nunique() if "customer" in raw_df.columns 
 
 st.header("Sales Performance Overview")
 col1, col2, col3 = st.columns(3)
-col1.metric("Total Sales (PKR)", f"{total_amount:,.0f}")
+col1.metric("Total Sales (PKR)", f"{total_amount:{CURRENCY_FORMAT}}")
 col2.metric("Total Transactions", f"{total_txns:,}")
 col3.metric("Unique Customers (by Phone)", f"{unique_customers:,}")
 
 
-# ---------- CUSTOMER RETENTION METRIC (New vs. Return) ----------
+# ---------- CUSTOMER RETENTION METRIC (New Feature) ----------
 
-if CUSTOMER_TYPE_COL in exploded_df.columns:
-    st.header("Customer Retention Analysis")
+if CUSTOMER_TYPE_COL in raw_df.columns and AMOUNT_COL in raw_df.columns:
+    st.header("Customer Lifetime Value & Retention")
     
+    # 1. Total unique customers (based on phone number)
+    total_unique_customers = raw_df[CUSTOMER_COL].nunique()
+    
+    # 2. Customers classified as 'Return'
+    returned_customers = raw_df[raw_df[CUSTOMER_TYPE_COL] == "Return"][CUSTOMER_COL].nunique()
+    
+    # --- Calculate Average Transaction Values (using raw_df for transaction value) ---
+    
+    # Group raw transactions by customer type and calculate average amount
+    avg_txn_by_type = (
+        raw_df.groupby(CUSTOMER_TYPE_COL)[AMOUNT_COL]
+        .mean()
+        .rename("Avg Txn Value")
+    )
+    
+    avg_new = avg_txn_by_type.get("New", 0)
+    avg_return = avg_txn_by_type.get("Return", 0)
+    
+    # Calculate difference
+    avg_spend_increase = avg_return - avg_new
+    
+    # Determine the indicator color
+    if avg_spend_increase > 0:
+        delta_color = "inverse" # Green delta for increase
+    elif avg_spend_increase < 0:
+        delta_color = "off" # Red delta for decrease
+    else:
+        delta_color = "normal"
+    
+    ret_col1, ret_col2, ret_col3 = st.columns(3)
+    
+    # Metric 1: Total Unique Customers
+    ret_col1.metric("Total Unique Customers", f"{total_unique_customers:,}")
+    
+    # Metric 2: Customers That Returned
+    ret_col2.metric("Customers That Returned", f"{returned_customers:,}")
+    
+    # Metric 3: Average Spend Increase (Retention Value)
+    ret_col3.metric(
+        "Avg Spend Increase (Return vs New)", 
+        f"{avg_return:{AVG_FORMAT}}", 
+        delta=f"{avg_spend_increase:{AVG_FORMAT}}",
+        delta_color=delta_color,
+        help="The average transaction value for a 'Return' customer vs. their initial 'New' average."
+    )
+    
+    st.markdown("---")
+    
+    # Display detailed retention breakdown table (Original logic)
     retention_sales = (
         exploded_df.groupby(CUSTOMER_TYPE_COL)[GROSS_AMOUNT_PER_COMMODITY_COL]
         .sum()
@@ -185,11 +237,13 @@ if CUSTOMER_TYPE_COL in exploded_df.columns:
     retention_df = pd.concat([retention_sales, retention_customers], axis=1).fillna(0)
     
     if not retention_df.empty:
-        total_customers = retention_df["Unique Customers"].sum()
-        retention_df["Customer Share (%)"] = (retention_df["Unique Customers"] / total_customers * 100).round(1)
+        total_customers_in_table = retention_df["Unique Customers"].sum()
+        retention_df["Customer Share (%)"] = (retention_df["Unique Customers"] / total_customers_in_table * 100).round(1)
 
+        st.subheader("Sales and Customer Breakdown by Type")
         st.dataframe(retention_df.style.format({
-            "Sales Amount": "PKR {:,.0f}",
+            "Sales Amount": f"{CURRENCY_CODE} {{:{CURRENCY_FORMAT}}}",
+            "Unique Customers": "{:,.0f}",
             "Customer Share (%)": "{:,.1f}%"
         }), use_container_width=True)
 
@@ -204,32 +258,41 @@ if CUSTOMER_TYPE_COL in exploded_df.columns:
         st.altair_chart(sales_share_chart, use_container_width=True)
     
 else:
-    st.info("Customer Type analysis requires the 'customer_type' column.")
+    st.info("Customer retention analysis requires the 'customer_type' and 'amount' columns.")
 
 st.markdown("---")
 
-# ---------- SALES BY COMMODITY (Now Fixed) ----------
+# ---------- SALES BY COMMODITY (Chart Format) ----------
 
 if "commodity" in exploded_df.columns:
     st.header("Sales by Commodity")
 
-    commodity_sales = (
-        exploded_df.groupby("commodity")[GROSS_AMOUNT_PER_COMMODITY_COL] # Use the proportional amount
+    commodity_sales_df = (
+        exploded_df.groupby("commodity")[GROSS_AMOUNT_PER_COMMODITY_COL] 
         .sum()
-        .sort_values(ascending=False)
+        .rename("Total Sales")
+        .reset_index()
     )
 
-    # Filter out the 'nan' commodity group (which means parsing failed for that row)
-    commodity_sales = commodity_sales[commodity_sales.index.notna()].head(15)
+    # Filter out the 'nan' commodity group
+    commodity_sales_df = commodity_sales_df[commodity_sales_df['commodity'].notna()].head(15)
 
-    if not commodity_sales.empty:
+    if not commodity_sales_df.empty:
         st.subheader("Top Selling Commodities by Sales")
-        st.bar_chart(commodity_sales)
+
+        # Create Altair Bar Chart
+        commodity_chart = alt.Chart(commodity_sales_df).mark_bar().encode(
+            x=alt.X('Total Sales', title=f'Total Sales ({CURRENCY_CODE})', axis=alt.Axis(format=CURRENCY_FORMAT)),
+            y=alt.Y('commodity', sort='-x', title='Commodity'),
+            tooltip=['commodity', alt.Tooltip('Total Sales', format=f"{CURRENCY_CODE} {CURRENCY_FORMAT}", title='Total Sales')]
+        ).properties(title="Commodity Sales Volume").interactive()
+        
+        st.altair_chart(commodity_chart, use_container_width=True)
     else:
         st.info("No valid commodity data found to plot.")
 
 
-# ---------- NEW FEATURE: RETURN CUSTOMERS BY COMMODITY ----------
+# ---------- RETURN CUSTOMERS BY COMMODITY ----------
 
 if CUSTOMER_TYPE_COL in exploded_df.columns:
     st.header("Return Customer Loyalty by Commodity")
@@ -242,20 +305,85 @@ if CUSTOMER_TYPE_COL in exploded_df.columns:
     
     if not return_customers_df.empty:
         # 2. Group by commodity and count unique phone numbers (customers)
-        return_customer_loyalty = (
+        return_customer_loyalty_df = (
             return_customers_df
             .groupby("commodity")[CUSTOMER_COL]
             .nunique()
             .rename("Unique Return Customers")
-            .sort_values(ascending=False)
+            .reset_index()
+            .sort_values(by="Unique Return Customers", ascending=False)
             .head(15)
         )
         
         st.subheader("Commodities with Most Unique Return Buyers")
-        st.dataframe(return_customer_loyalty, use_container_width=True)
-        st.bar_chart(return_customer_loyalty)
+        st.dataframe(return_customer_loyalty_df, use_container_width=True, hide_index=True)
+        
+        # Create Altair Bar Chart for Return Customers
+        return_chart = alt.Chart(return_customer_loyalty_df).mark_bar().encode(
+            x=alt.X('Unique Return Customers', title='Unique Return Customers'),
+            y=alt.Y('commodity', sort='-x', title='Commodity'),
+            tooltip=['commodity', 'Unique Return Customers']
+        ).properties(title="Return Customer Count by Commodity").interactive()
+        
+        st.altair_chart(return_chart, use_container_width=True)
     else:
         st.info("No 'Return' customer data found to analyze loyalty.")
+
+st.markdown("---")
+
+# ---------- COMMODITY SEASONALITY ANALYSIS (Line Chart) ----------
+
+if "date" in exploded_df.columns and "commodity" in exploded_df.columns:
+    st.header("Commodity Seasonality Analysis")
+    st.caption("Monthly sales trends to identify peak selling seasons.")
+    
+    # Ensure 'date' is a datetime object for resampling
+    seasonality_df = exploded_df.copy()
+    seasonality_df['date'] = pd.to_datetime(seasonality_df['date'])
+
+    # Aggregate sales by month and commodity
+    seasonality_summary = (
+        seasonality_df.set_index('date')
+        .groupby(['commodity'])
+        .resample('ME')[GROSS_AMOUNT_PER_COMMODITY_COL] # 'ME' means Month End
+        .sum()
+        .rename("Total Sales")
+        .reset_index()
+    )
+    
+    # Filter out 'nan' commodity type
+    seasonality_summary = seasonality_summary[seasonality_summary['commodity'].notna()]
+    
+    if not seasonality_summary.empty:
+        
+        commodity_list = sorted(seasonality_summary["commodity"].unique().tolist())
+        selected_commodity = st.selectbox(
+            "Select Commodity for Trend Analysis", options=commodity_list, index=0
+        )
+
+        seasonality_chart_data = seasonality_summary[
+            seasonality_summary["commodity"] == selected_commodity
+        ]
+        
+        if not seasonality_chart_data.empty:
+            # Create Altair Line Chart for Seasonality
+            seasonality_chart = alt.Chart(seasonality_chart_data).mark_line(point=True).encode(
+                x=alt.X('date', title='Month', axis=alt.Axis(format="%Y-%m")),
+                y=alt.Y('Total Sales', title=f'Total Sales ({CURRENCY_CODE})', axis=alt.Axis(format=CURRENCY_FORMAT)),
+                tooltip=[
+                    alt.Tooltip('date', title='Month', format="%Y-%m"),
+                    alt.Tooltip('Total Sales', title='Sales Amount', format=f"{CURRENCY_CODE} {CURRENCY_FORMAT}")
+                ]
+            ).properties(
+                title=f"Monthly Sales Trend for {selected_commodity}"
+            ).interactive()
+
+            st.altair_chart(seasonality_chart, use_container_width=True)
+        else:
+            st.info(f"No seasonality data found for {selected_commodity}.")
+
+    else:
+        st.info("Not enough data to analyze seasonality.")
 
 
 st.markdown("---")
