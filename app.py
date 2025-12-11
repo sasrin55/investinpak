@@ -8,7 +8,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from zoneinfo import ZoneInfo
 
-# NOTE: This imports the updated load_data function which uses the direct CSV URL.
+# NOTE: This imports the updated load_data function which uses the direct URL.
 from report_utils import (
     load_data,
     explode_commodities,
@@ -21,8 +21,9 @@ from report_utils import (
 )
 
 # --- GOOGLE SHEET URL CONFIGURATION ---
-# Updated GID to point to the 'Master for SalesOps' tab (GID=1105756916)
-MAIN_DATA_URL = "https://docs.google.com/spreadsheets/d/1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q/gviz/tq?tqx=out:csv&gid=1105756916"
+# IMPORTANT: This is the standard edit URL for the 'Master for SalesOps' tab (GID=1105756916).
+# The new helper function in report_utils.py will automatically convert this to the CSV export link.
+MAIN_DATA_URL = "https://docs.google.com/spreadsheets/d/1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q/edit?resourcekey=&gid=1105756916#gid=1105756916"
 
 # -----------------------------------------------------------------------------
 # PAGE CONFIG
