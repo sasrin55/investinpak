@@ -3,26 +3,73 @@ import pandas as pd
 import numpy as np
 from datetime import date
 from typing import Dict, Any
+from urllib.parse import urlparse, parse_qs # Step 1: Add new import
 
 # --- CONSTANTS ---
 CURRENCY_CODE = "PKR"
 CURRENCY_FORMAT = ",.0f"  # e.g., 10,000
 
 
-# --- DATA LOADING AND CLEANING ---
+# --- DATA LOADING HELPERS ---
+
+def normalize_gsheet_url(sheet_url: str) -> str: # Step 2: Add helper function
+    """
+    Converts a normal Google Sheets URL (edit URL) into a direct CSV export URL.
+    If the URL is already a CSV URL or a non-Google URL, it is returned as-is.
+    """
+    if not sheet_url:
+        return sheet_url
+
+    # If it's already an export CSV link, just return it
+    if "export?format=csv" in sheet_url:
+        return sheet_url
+
+    if "docs.google.com/spreadsheets" in sheet_url:
+        parsed = urlparse(sheet_url)
+        path_parts = parsed.path.split("/")
+
+        file_id = None
+        for i, part in enumerate(path_parts):
+            if part == "d" and i + 1 < len(path_parts):
+                file_id = path_parts[i + 1]
+                break
+
+        # default gid to 0 if missing
+        query = parse_qs(parsed.query)
+        # Prioritize gid from the original query parameters
+        gid = query.get("gid", ["0"])[0] 
+        
+        # Check for fragment gid if it's an edit URL (like the one provided)
+        if "#gid" in parsed.fragment:
+            fragment_query = parse_qs(parsed.fragment.lstrip('#'))
+            gid = fragment_query.get("gid", [gid])[0]
+
+        if file_id:
+            return f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=csv&gid={gid}"
+
+    # Fallback: return unchanged
+    return sheet_url
+
 
 @st.cache_data(ttl=300)
-def load_data(sheet_url: str) -> pd.DataFrame:
+def load_data(sheet_url: str) -> pd.DataFrame: # Step 3: Replace existing load_data
     """
-    Loads data directly from the CSV export URL of a public Google Sheet.
-    
-    This function handles the new column names from the 'Master for SalesOps' sheet
-    and standardizes them for the application.
+    Loads data from a Google Sheet (edit URL or CSV URL) and normalises it
+    for the 'Master for SalesOps' structure:
+      - Date          -> date_str / date
+      - Customer      -> customer_name
+      - Customer type -> customer_type
+      - Commodity     -> commodities_list
+      - Amount        -> amount_pkr
+      - Duration      -> duration (left as-is)
     """
     try:
-        df = pd.read_csv(sheet_url)
+        # Convert a normal Google Sheets URL into a CSV export URL automatically
+        csv_url = normalize_gsheet_url(sheet_url)
 
-        # 1. Standardize column names (lowercase + underscores, no parentheses)
+        df = pd.read_csv(csv_url)
+
+        # Standardize column names (lowercase + underscores, no parentheses)
         df.columns = [
             col.lower()
             .replace(" ", "_")
@@ -31,39 +78,41 @@ def load_data(sheet_url: str) -> pd.DataFrame:
             for col in df.columns
         ]
 
-        # 2. Rename new/clean headers to application-required variable names
         renames = {}
-        
-        # Map 'date' (from new sheet header) -> 'date_str' for date processing
+
+        # Date column (from 'Master for SalesOps' -> "date")
         if "date" in df.columns:
             renames["date"] = "date_str"
-        
-        # Map 'customer' (which holds the Phone Number) -> 'customer_name'
+        if "start_date" in df.columns and "date_str" not in renames and "date_str" not in df.columns:
+            renames["start_date"] = "date_str"
+        if "timestamp" in df.columns and "date_str" not in renames and "date_str" not in df.columns:
+            renames["timestamp"] = "date_str"
+
+        # Customer -> customer_name (The phone number)
         if "customer" in df.columns:
             renames["customer"] = "customer_name"
-            
-        # Map 'commodity' -> 'commodities_list' for the explode function
+
+        # Commodity -> commodities_list (used by explode_commodities)
         if "commodity" in df.columns:
             renames["commodity"] = "commodities_list"
 
-        # Map 'amount' -> 'amount_pkr' for sales calcs
+        # Amount -> amount_pkr (numeric sales amount)
         if "amount" in df.columns:
             renames["amount"] = "amount_pkr"
 
+        # Month -> month_str (for historical sheets, optional)
+        if "month" in df.columns:
+            renames["month"] = "month_str"
+            
+        # The 'customer_type' column does not need a rename as 'customer_type' is already the clean name
+
+        # Apply all renames
         if renames:
             df.rename(columns=renames, inplace=True)
-        
-        # --- Other Renaming/Legacy (Keep for safety) ---
-        if "timestamp" in df.columns:
-            df.rename(columns={"timestamp": "date_str"}, inplace=True)
-        if "type" in df.columns and "commodities_list" not in df.columns:
-            df.rename(columns={"type": "commodities_list"}, inplace=True)
-        if "month" in df.columns:
-            df.rename(columns={"month": "month_str"}, inplace=True)
 
-        # --- Type conversions ---
+        # ---- Type conversions ----
 
-        # Convert date_str -> date (python date object)
+        # date_str -> date (python date object)
         if "date_str" in df.columns:
             df["date"] = pd.to_datetime(
                 df["date_str"],
@@ -72,7 +121,7 @@ def load_data(sheet_url: str) -> pd.DataFrame:
                 infer_datetime_format=True,
             ).dt.date
 
-        # Convert amount_pkr to numeric, stripping commas
+        # Ensure amount_pkr is numeric
         if "amount_pkr" in df.columns:
             df["amount_pkr"] = pd.to_numeric(
                 df["amount_pkr"].astype(str).str.replace(",", ""),
