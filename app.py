@@ -8,7 +8,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from zoneinfo import ZoneInfo
 
-# NOTE: This imports the updated load_data function which uses the direct URL.
+# NOTE: This imports the updated load_data function which uses the direct CSV URL.
 from report_utils import (
     load_data,
     explode_commodities,
@@ -20,10 +20,10 @@ from report_utils import (
     CURRENCY_FORMAT,
 )
 
-# --- GOOGLE SHEET URL CONFIGURATION ---
-# IMPORTANT: This is the standard edit URL for the 'Master for SalesOps' tab (GID=1105756916).
-# The new helper function in report_utils.py will automatically convert this to the CSV export link.
-MAIN_DATA_URL = "https://docs.google.com/spreadsheets/d/1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q/edit?resourcekey=&gid=1105756916#gid=1105756916"
+# --- GOOGLE SHEET URL CONFIGURATION (EXPLICIT CSV EXPORT LINK) ---
+# File ID: 1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q
+# GID: 1105756916 (Master for SalesOps)
+MAIN_DATA_URL = "https://docs.google.com/spreadsheets/d/1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q/gviz/tq?tqx=out:csv&gid=1105756916"
 
 # -----------------------------------------------------------------------------
 # PAGE CONFIG
@@ -45,15 +45,13 @@ st.markdown("---")
 def cached_load_data():
     """
     Load data from Google Sheets using the direct URL.
-    
-    ttl=300 means Streamlit will reload from the Sheet at most every 5 minutes.
     """
-    # Use the simplified load_data function with the URL
+    # Use the simplified load_data function with the explicit CSV URL
     df = load_data(sheet_url=MAIN_DATA_URL)
     
     # Check if necessary columns exist after loading and cleaning
     if df.empty or 'date' not in df.columns or 'customer_name' not in df.columns:
-        st.error("Error: Main dashboard data is missing essential columns (date or customer_name). Check sheet headers or access.")
+        st.error("Error: Main dashboard data is missing essential columns (date or customer_name). Check load_data mappings.")
         # Return empty data structure if load fails
         return pd.DataFrame(), datetime.now(ZoneInfo("Asia/Karachi"))
 
