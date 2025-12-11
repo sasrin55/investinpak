@@ -32,9 +32,6 @@ def explode_commodities(df: pd.DataFrame) -> pd.DataFrame:
     """
     Takes a dataframe and ensures each row represents one commodity, 
     calculating the proportional amount for it.
-    
-    This version simplifies the logic to handle single commodity names 
-    (as seen in the Master for SalesOps sheet) more robustly.
     """
     df_temp = df.copy()
     
@@ -52,12 +49,11 @@ def explode_commodities(df: pd.DataFrame) -> pd.DataFrame:
 
     required_cols = [COMMODITIES_COL, AMOUNT_COL, CUSTOMER_TYPE_COL]
     if not all(col in df_temp.columns for col in required_cols):
-        # Return empty if core columns are missing after rename
         return pd.DataFrame(columns=original_cols + ["commodity", GROSS_AMOUNT_PER_COMMODITY_COL])
 
     df_temp[COMMODITIES_COL] = df_temp[COMMODITIES_COL].fillna("")
 
-    # --- SIMPLIFIED EXPLODE LOGIC ---
+    # --- FIX: ASSUME SIMPLE LISTS AND SPLIT AMOUNT EQUALLY ---
     
     # 2. Split the list by comma and explode
     df_temp["commodity_items"] = df_temp[COMMODITIES_COL].str.split(",").apply(
@@ -65,13 +61,12 @@ def explode_commodities(df: pd.DataFrame) -> pd.DataFrame:
     )
     df_exploded = df_temp.explode("commodity_items")
     
-    # 3. Assign commodity name
+    # 3. Assign commodity name (The item itself)
     df_exploded["commodity"] = df_exploded["commodity_items"].astype(str).str.strip()
     
-    # 4. Calculate proportional amount (Assume equal split for now, 
-    # as the data appears to be a list of names like "Wheat, Paddy")
+    # 4. Calculate proportional amount (Split total transaction amount equally)
     
-    # Count how many commodities are in the original transaction
+    # Count how many commodities were in the original transaction
     count_items_per_txn = df_exploded.groupby(df_exploded.index)["commodity_items"].transform("count")
     
     df_exploded[GROSS_AMOUNT_PER_COMMODITY_COL] = np.where(
@@ -121,6 +116,10 @@ def load_data() -> pd.DataFrame:
             .str.replace(",", "", regex=False)
         )
         df["amount"] = pd.to_numeric(df["amount"], errors="coerce").fillna(0)
+    
+    # --- FIX: UNIFY CUSTOMER TYPE ---
+    if CUSTOMER_TYPE_COL in df.columns:
+        df[CUSTOMER_TYPE_COL] = df[CUSTOMER_TYPE_COL].str.strip().str.title()
 
     # Drop fully empty rows
     df = df.dropna(how="all")
@@ -140,7 +139,7 @@ if raw_df.empty:
 exploded_df = explode_commodities(raw_df)
 
 
-# --- START FIX FOR TYPE ERROR ON DATE MIN/MAX ---
+# --- Date range calculation (Type Error Fix) ---
 valid_dates = raw_df["date"].dropna()
 
 if valid_dates.empty:
@@ -149,7 +148,6 @@ if valid_dates.empty:
 else:
     min_data_date = valid_dates.min()
     max_data_date = valid_dates.max()
-# --- END FIX FOR TYPE ERROR ON DATE MIN/MAX ---
 
 
 st.write("---")
@@ -167,7 +165,7 @@ col2.metric("Total Transactions", f"{total_txns:,}")
 col3.metric("Unique Customers (by Phone)", f"{unique_customers:,}")
 
 
-# ---------- CUSTOMER RETENTION METRIC ----------
+# ---------- CUSTOMER RETENTION METRIC (New vs. Return) ----------
 
 if CUSTOMER_TYPE_COL in exploded_df.columns:
     st.header("Customer Retention Analysis")
@@ -196,7 +194,6 @@ if CUSTOMER_TYPE_COL in exploded_df.columns:
         }), use_container_width=True)
 
         st.subheader("Customer Type Sales Share")
-        # Plotting Customer Share of Sales
         sales_share_chart = alt.Chart(retention_df.reset_index()).mark_arc().encode(
             theta=alt.Theta(field="Sales Amount", type="quantitative"),
             color=alt.Color(field=CUSTOMER_TYPE_COL, type="nominal", title="Customer Type"),
@@ -211,7 +208,7 @@ else:
 
 st.markdown("---")
 
-# ---------- SALES BY COMMODITY (Using Exploded Data for Accuracy) ----------
+# ---------- SALES BY COMMODITY (Now Fixed) ----------
 
 if "commodity" in exploded_df.columns:
     st.header("Sales by Commodity")
@@ -226,9 +223,41 @@ if "commodity" in exploded_df.columns:
     commodity_sales = commodity_sales[commodity_sales.index.notna()].head(15)
 
     if not commodity_sales.empty:
+        st.subheader("Top Selling Commodities by Sales")
         st.bar_chart(commodity_sales)
     else:
         st.info("No valid commodity data found to plot.")
 
+
+# ---------- NEW FEATURE: RETURN CUSTOMERS BY COMMODITY ----------
+
+if CUSTOMER_TYPE_COL in exploded_df.columns:
+    st.header("Return Customer Loyalty by Commodity")
+    st.caption("Count of unique 'Return' customers who purchased each commodity.")
+
+    # 1. Filter for Return Customers (using the unified 'Return' type)
+    return_customers_df = exploded_df[
+        exploded_df[CUSTOMER_TYPE_COL] == "Return"
+    ]
+    
+    if not return_customers_df.empty:
+        # 2. Group by commodity and count unique phone numbers (customers)
+        return_customer_loyalty = (
+            return_customers_df
+            .groupby("commodity")[CUSTOMER_COL]
+            .nunique()
+            .rename("Unique Return Customers")
+            .sort_values(ascending=False)
+            .head(15)
+        )
+        
+        st.subheader("Commodities with Most Unique Return Buyers")
+        st.dataframe(return_customer_loyalty, use_container_width=True)
+        st.bar_chart(return_customer_loyalty)
+    else:
+        st.info("No 'Return' customer data found to analyze loyalty.")
+
+
+st.markdown("---")
 st.subheader("Reporting Period:")
 st.caption(f"Data available from {min_data_date} to {max_data_date}")
