@@ -1,5 +1,9 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
+from datetime import date, timedelta, datetime
+import altair as alt
+from typing import Dict, Any
 
 st.set_page_config(
     page_title="Zarai Mandi Sales Dashboard",
@@ -11,7 +15,100 @@ st.caption("Transaction and Commodity-level Sales Intelligence.")
 
 # ---------- CONFIG ----------
 
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q/export?format=csv&gid=1105756916"
+# EXPLICIT CSV EXPORT LINK for 'Master for SalesOps' (GID=1105756916)
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1kTy_-jB_cPfvXN-Lqe9WMSD-moeI-OF5kE4PbMN7M1Q/gviz/tq?tqx=out:csv&gid=1105756916"
+
+# Define the expected final column names after cleaning/renaming
+COMMODITIES_COL = "commodities_list"
+AMOUNT_COL = "amount_pkr"
+CUSTOMER_COL = "customer_name"
+GROSS_AMOUNT_PER_COMMODITY_COL = "gross_amount_per_commodity"
+
+
+# ---------- DATA TRANSFORMATIONS (Explode Logic) ----------
+
+def explode_commodities(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Takes a dataframe where the COMMODITIES_COL contains a comma-separated
+    list of commodity names and amounts and explodes this into one row per commodity.
+    """
+    df_temp = df.copy()
+    
+    # 1. Rename columns to the names expected by this function (for compatibility)
+    df_temp.rename(
+        columns={
+            "commodity": COMMODITIES_COL,
+            "amount": AMOUNT_COL,
+            "customer": CUSTOMER_COL,
+        },
+        inplace=True,
+    )
+    
+    original_cols = list(df_temp.columns)
+
+    required_cols = [COMMODITIES_COL, AMOUNT_COL]
+    if not all(col in df_temp.columns for col in required_cols):
+        return pd.DataFrame(columns=original_cols + ["commodity", GROSS_AMOUNT_PER_COMMODITY_COL])
+
+    if df_temp[COMMODITIES_COL].isna().all():
+        return pd.DataFrame(columns=original_cols + ["commodity", GROSS_AMOUNT_PER_COMMODITY_COL])
+
+    df_temp[COMMODITIES_COL] = df_temp[COMMODITIES_COL].fillna("")
+
+    # 2. Split the list by comma and explode
+    df_temp["commodity_items"] = df_temp[COMMODITIES_COL].str.split(",").apply(
+        lambda x: [item.strip() for item in x if str(item).strip()]
+    )
+    df_exploded = df_temp.explode("commodity_items")
+    
+    # 3. Handle cases where the commodity list is not split by amount
+    
+    # Check if any item contains digits at the start 
+    has_split_amounts = df_exploded["commodity_items"].str.match(r"^\s*\d+").any()
+
+    if has_split_amounts:
+        # Complex logic (for "200 Edible oil, 300 Paddy")
+        pattern = r"^\s*(\d+)\s*(.*)"
+        df_exploded[["amount_split", "commodity"]] = df_exploded["commodity_items"].str.extract(pattern)
+        df_exploded["amount_split"] = pd.to_numeric(df_exploded["amount_split"], errors="coerce").fillna(0)
+        
+        sum_split_per_txn = df_exploded.groupby(df_exploded.index)["amount_split"].transform("sum")
+        count_items_per_txn = df_exploded.groupby(df_exploded.index)["commodity_items"].transform("count")
+
+        df_exploded[GROSS_AMOUNT_PER_COMMODITY_COL] = np.where(
+            (sum_split_per_txn > 0) & (df_exploded[AMOUNT_COL] > 0),
+            df_exploded["amount_split"] / sum_split_per_txn * df_exploded[AMOUNT_COL],
+            np.where(
+                count_items_per_txn > 0,
+                df_exploded[AMOUNT_COL] / count_items_per_txn,
+                0,
+            ),
+        )
+        # Final commodity name is the text part of the split
+        df_exploded["commodity"] = df_exploded["commodity"].astype(str).str.strip()
+        
+    else:
+        # Simple logic (for "Wheat, Cotton, Paddy") - split transaction amount equally
+        df_exploded["commodity"] = df_exploded["commodity_items"].astype(str).str.strip()
+        count_items_per_txn = df_exploded.groupby(df_exploded.index)["commodity_items"].transform("count")
+        
+        df_exploded[GROSS_AMOUNT_PER_COMMODITY_COL] = np.where(
+             count_items_per_txn > 0,
+             df_exploded[AMOUNT_COL] / count_items_per_txn,
+             0,
+        )
+
+    # 5. Filter out empty commodities and keep necessary columns
+    df_final = df_exploded[df_exploded["commodity"] != ""].copy()
+
+    final_cols = [col for col in original_cols if col not in [COMMODITIES_COL, AMOUNT_COL]] 
+    final_cols += ["commodity", GROSS_AMOUNT_PER_COMMODITY_COL]
+    
+    # Ensure customer is retained for unique count
+    if CUSTOMER_COL not in final_cols:
+         final_cols.append(CUSTOMER_COL)
+
+    return df_final[final_cols].reset_index(drop=True)
 
 
 # ---------- DATA LOADING ----------
@@ -28,11 +125,12 @@ def load_data() -> pd.DataFrame:
         .str.replace("(", "", regex=False)
         .str.replace(")", "", regex=False)
     )
-    # Expected: date, customer, customer_type, commodity, amount, duration, ...
+    # Expecting: date, customer, customer_type, commodity, amount, duration, ...
 
     # Parse date
     if "date" in df.columns:
-        df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.date
+        # Using dayfirst=True to handle common non-US date formats
+        df["date"] = pd.to_datetime(df["date"], errors="coerce", dayfirst=True).dt.date
 
     # Clean numeric amount
     if "amount" in df.columns:
@@ -43,174 +141,76 @@ def load_data() -> pd.DataFrame:
         )
         df["amount"] = pd.to_numeric(df["amount"], errors="coerce").fillna(0)
 
+    # Drop fully empty rows
     df = df.dropna(how="all")
 
     return df
 
 
-df = load_data()
+# --- EXECUTION ---
+raw_df = load_data()
 
-if df.empty:
+# If nothing loaded, show a clear message
+if raw_df.empty:
     st.error("No data loaded from Google Sheets. Check sharing permissions and the URL.")
     st.stop()
 
-# ---------- SIDEBAR FILTERS ----------
+# Explode the commodity data for accurate sales breakdown
+exploded_df = explode_commodities(raw_df)
 
-with st.sidebar:
-    st.header("Filters")
+# --- START FIX FOR TYPE ERROR ON DATE MIN/MAX ---
 
-    if "date" in df.columns:
-        min_date = df["date"].min()
-        max_date = df["date"].max()
-        start_date, end_date = st.date_input(
-            "Date range",
-            value=(min_date, max_date),
-            min_value=min_date,
-            max_value=max_date,
-        )
-    else:
-        start_date, end_date = None, None
+# Filter out NaT values (which occur on failed date conversions)
+valid_dates = raw_df["date"].dropna()
 
-    customer_type_filter = None
-    if "customer_type" in df.columns:
-        all_types = sorted(df["customer_type"].dropna().unique().tolist())
-        customer_type_filter = st.multiselect(
-            "Customer type",
-            options=all_types,
-            default=all_types,
-        )
+if valid_dates.empty:
+    # If no valid dates are found, set defaults safely
+    min_data_date = date(2020, 1, 1)
+    max_data_date = date.today()
+else:
+    # Find the minimum and maximum of the valid date objects
+    # This avoids the TypeError that occurs when mixing date objects and NaT/NaN during min()
+    min_data_date = valid_dates.min()
+    max_data_date = valid_dates.max()
 
-# Apply filters
-df_filtered = df.copy()
+# --- END FIX FOR TYPE ERROR ON DATE MIN/MAX ---
 
-if start_date and end_date and "date" in df_filtered.columns:
-    df_filtered = df_filtered[
-        (df_filtered["date"] >= start_date) & (df_filtered["date"] <= end_date)
-    ]
 
-if customer_type_filter and "customer_type" in df_filtered.columns:
-    df_filtered = df_filtered[df_filtered["customer_type"].isin(customer_type_filter)]
+st.write("---")
+st.write("Preview of Raw Data (First 5 Transactions):")
+st.dataframe(raw_df.head(5), use_container_width=True)
+st.write("Preview of Exploded Commodity Data (First 10 Rows):")
+st.dataframe(exploded_df.head(10), use_container_width=True)
+st.write("---")
 
-# If still empty after filters, bail early
-if df_filtered.empty:
-    st.warning("No data for the selected filters.")
-    st.stop()
 
-# ---------- DATA PREVIEW ----------
+# ---------- SIMPLE KPIs (Using Raw Data for Total Transactions/Customers) ----------
 
-with st.expander("Preview data (filtered)", expanded=False):
-    st.dataframe(df_filtered.head(20), use_container_width=True)
-
-# ---------- CORE KPIs ----------
-
-total_amount = df_filtered["amount"].sum() if "amount" in df_filtered.columns else 0
-total_txns = len(df_filtered)
-unique_customers = (
-    df_filtered["customer"].nunique() if "customer" in df_filtered.columns else 0
-)
+total_amount = raw_df["amount"].sum() if "amount" in raw_df.columns else 0
+total_txns = len(raw_df)
+unique_customers = raw_df["customer"].nunique() if "customer" in raw_df.columns else 0
 
 col1, col2, col3 = st.columns(3)
 col1.metric("Total Sales (PKR)", f"{total_amount:,.0f}")
 col2.metric("Total Transactions", f"{total_txns:,}")
-col3.metric("Unique Customers", f"{unique_customers:,}")
+col3.metric("Unique Customers (by Phone)", f"{unique_customers:,}")
 
-# ---------- NEW vs RETURNING CUSTOMERS ----------
+# ---------- SALES BY COMMODITY (Using Exploded Data for Accuracy) ----------
 
-# Definition:
-# - For each customer, compute their first-ever transaction date in the FULL dataset
-# - In the filtered range:
-#     New = first_txn_date within [start_date, end_date]
-#     Returning = first_txn_date before start_date
-new_customers_count = 0
-returning_customers_count = 0
-retention_rate = 0.0
+if "commodity" in exploded_df.columns:
+    st.subheader("Sales by Commodity (Accurate Breakdown)")
 
-if "customer" in df.columns and "date" in df.columns and start_date and end_date:
-    # First transaction date per customer on the full dataset
-    first_txn = df.groupby("customer")["date"].min()
-
-    # Customers present in the current filtered dataset
-    customers_in_range = df_filtered["customer"].unique()
-
-    new_customers = []
-    returning_customers = []
-
-    for cust in customers_in_range:
-        first_date = first_txn.get(cust)
-        if first_date is None:
-            continue
-        if start_date <= first_date <= end_date:
-            new_customers.append(cust)
-        elif first_date < start_date:
-            returning_customers.append(cust)
-
-    new_customers_count = len(new_customers)
-    returning_customers_count = len(returning_customers)
-
-    total_cust_in_range = len(customers_in_range)
-    retention_rate = (
-        returning_customers_count / total_cust_in_range * 100
-        if total_cust_in_range > 0
-        else 0.0
-    )
-
-st.markdown("### Customer Dynamics")
-
-c1, c2, c3 = st.columns(3)
-c1.metric("New Customers (in range)", new_customers_count)
-c2.metric("Returning Customers (in range)", returning_customers_count)
-c3.metric("Retention Rate", f"{retention_rate:.1f}%")
-
-# You can also show the lists if you want:
-with st.expander("New vs Returning customer lists"):
-    if new_customers_count > 0:
-        st.subheader("New customers")
-        st.write(pd.DataFrame({"customer": new_customers}))
-    else:
-        st.write("No new customers in this range.")
-
-    if returning_customers_count > 0:
-        st.subheader("Returning customers")
-        st.write(pd.DataFrame({"customer": returning_customers}))
-    else:
-        st.write("No returning customers in this range.")
-
-# ---------- TOP 10 CUSTOMERS ----------
-
-st.markdown("### Top 10 Customers (by sales in selected range)")
-
-if "customer" in df_filtered.columns and "amount" in df_filtered.columns:
-    top_cust = (
-        df_filtered.groupby("customer")
-        .agg(
-            total_amount=("amount", "sum"),
-            transactions=("amount", "count"),
-        )
-        .sort_values("total_amount", ascending=False)
-        .head(10)
-        .reset_index()
-    )
-
-    st.dataframe(top_cust, use_container_width=True)
-
-    # Quick bar chart of total_amount by customer
-    st.bar_chart(
-        data=top_cust.set_index("customer")["total_amount"]
-    )
-else:
-    st.info("Missing 'customer' or 'amount' column, cannot compute top customers.")
-
-# ---------- SALES BY COMMODITY ----------
-
-st.markdown("### Sales by Commodity (filtered)")
-
-if "commodity" in df_filtered.columns and "amount" in df_filtered.columns:
     commodity_sales = (
-        df_filtered.groupby("commodity")["amount"]
+        exploded_df.groupby("commodity")[GROSS_AMOUNT_PER_COMMODITY_COL] # Use the proportional amount
         .sum()
         .sort_values(ascending=False)
         .head(10)
     )
+
     st.bar_chart(commodity_sales)
 else:
-    st.info("No 'commodity' column found to plot.")
+    st.info("No 'commodity' column found to plot after processing.")
+
+# --- Placeholder for future filtering logic that requires min/max dates ---
+st.subheader("Reporting Period:")
+st.caption(f"Data available from {min_data_date} to {max_data_date}")
